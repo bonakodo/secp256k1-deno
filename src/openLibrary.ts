@@ -12,7 +12,7 @@ export function openLibrary<S extends Deno.ForeignLibraryInterface>(
           ? 'secp256k1.dll'
           : Deno.build.os === 'darwin'
           ? 'libsecp256k1.dylib'
-          : 'libsecp256k1.so.0',
+          : 'libsecp256k1.so',
         symbols,
       );
     } catch (e) {
@@ -22,9 +22,9 @@ export function openLibrary<S extends Deno.ForeignLibraryInterface>(
 
       const error = new Error(
         'Native secp256k1 library was not found, try installing a `libsecp256k1` or `libsecp256k1-0` package.' +
-          ' If you have an existing installation, either add it to the LDPATH or set the `DENO_SECP256K1_PATH` environment variable.' +
+          ' If you have an existing installation, either add it to the LD_LIBRARY_PATH or set the `DENO_SECP256K1_PATH` environment variable.' +
           ' If you import experimental module then make sure that libsecp256k1 library was built with Schnorr signatures support.' +
-          ' Rebuild it with `--enable-schnorrsig --enable-experimental` parameters or use a different operating system distribution',
+          ' Rebuild it with `--enable-module-schnorrsig --enable-module-recovery` parameters or use a different operating system distribution',
       );
       error.cause = e;
       throw error;
