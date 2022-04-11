@@ -37,15 +37,25 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    container:
-      image: ubuntu:impish
 
     steps:
+      - name: Checkout libsecp256k1
+        uses: actions/checkout@v2
+        with:
+          name: bitcoin-core/secp256k1
+          ref: refs/heads/master
+      
+      - name: Build libsecp256k1
+        run: |
+          cd secp256k1
+          ./autogen.sh
+          ./configure --enable-module-schnorrsig --enable-module-recoverable
+          make
+          make check
+          make install
+
       - name: Checkout repo
         uses: actions/checkout@v2
-
-      - name: Install libsecp256k1 and unzip
-        run: apt-get update && apt-get install -y libsecp256k1-0 unzip
 
       - name: Install Deno
         uses: denoland/setup-deno@main

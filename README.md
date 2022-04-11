@@ -52,12 +52,12 @@ secp256k1.ecdsaVerify(signature, messageHash, publicKey);
 
 ## Schnorr signing and verification (experimental)
 
-Schnorr signing is experimental and must be explicitly enabled during `libsecp256k1` library build step by specifying the `--enable-schnorrsig` and `--enable-experimental` flags. This module provides bindings to the recoverable signing functions as well, therefore `--enable-module-recovery` is required as well.
+Schnorr signing is experimental and must be explicitly enabled during `libsecp256k1` library build step by specifying the `--enable-module-schnorrsig` flag. This deno module provides bindings to the recoverable signing functions as well, therefore `--enable-module-recovery` is mandatory too.
 
 Build the C library as follows:
 
 ```bash
-$ ./configure --enable-module-recovery --enable-schnorrsig --enable-experimental
+$ ./configure --enable-module-recovery --enable-module-schnorrsig
 $ make
 ```
 
