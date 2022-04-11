@@ -53,7 +53,7 @@ jobs:
         run: |
           cd secp256k1
           ./autogen.sh
-          ./configure --enable-module-schnorrsig --enable-module-recoverable
+          ./configure --enable-module-schnorrsig --enable-module-recovery
           make
           make check
           make install
