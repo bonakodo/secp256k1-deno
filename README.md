@@ -25,7 +25,7 @@ To run the examples below, launch Deno as follows: `deno run --allow-ffi --allow
 
 ```typescript
 // Import the library
-import * as secp256k1 from 'https://deno.land/x/libsecp256k1@0.0.1/mod.ts';
+import * as secp256k1 from 'https://deno.land/x/libsecp256k1@0.0.2/mod.ts';
 
 // Produce a message hash
 const message = 'Hello, Deno!';
@@ -76,7 +76,7 @@ To use Schnorr bindings import `mod-experimental.ts` instead of `mod.ts`.
 
 ```typescript
 // Import the experimental library
-import * as secp256k1 from 'https://deno.land/x/libsecp256k1@0.0.1/mod-experimental.ts';
+import * as secp256k1 from 'https://deno.land/x/libsecp256k1@0.0.2/mod-experimental.ts';
 
 // Produce a tagged message hash
 const message = 'Hello, Deno!';
