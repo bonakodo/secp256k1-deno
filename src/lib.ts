@@ -289,7 +289,6 @@ export function ecdsaVerify(
   messageHash: Uint8Array,
   publicKey: Uint8Array,
 ): boolean {
-  console.log('Right before verify');
   assertLength(32, messageHash);
   assert3365(publicKey);
   const parsedSignature = new Uint8Array(64);

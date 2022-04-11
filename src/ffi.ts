@@ -116,7 +116,7 @@ export function secp256k1_ec_pubkey_serialize(
   return lib.symbols.secp256k1_ec_pubkey_serialize(
     context,
     output,
-    new Uint8Array([outputlen]),
+    new BigUint64Array([BigInt(outputlen)]),
     pubkey,
     flags,
   );
