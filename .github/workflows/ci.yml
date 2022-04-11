@@ -40,9 +40,9 @@ jobs:
 
     steps:
       - name: Checkout libsecp256k1
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
-          name: bitcoin-core/secp256k1
+          repository: bitcoin-core/secp256k1
           ref: refs/heads/master
       
       - name: Build libsecp256k1
@@ -55,7 +55,7 @@ jobs:
           make install
 
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install Deno
         uses: denoland/setup-deno@main
