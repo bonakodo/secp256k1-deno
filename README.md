@@ -1,4 +1,4 @@
-# libsec256k1-deno
+# libsecp256k1-deno
 
 This module provides Deno native bindings to [bitcoin-core/secp256k1](https://github.com/bitcoin-core/secp256k1).
 
