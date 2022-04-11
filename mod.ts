@@ -1,1 +1,1 @@
-export * from "./src/lib.ts";
+export * from './src/lib.ts';

@@ -25,12 +25,12 @@ To run the examples below, launch Deno as follows: `deno run --allow-ffi --allow
 
 ```typescript
 // Import the library
-import * as secp256k1 from "https://deno.land/x/libsecp256k1@0.0.1/mod.ts";
+import * as secp256k1 from 'https://deno.land/x/libsecp256k1@0.0.1/mod.ts';
 
 // Produce a message hash
-const message = "Hello, Deno!";
+const message = 'Hello, Deno!';
 const messageHash = new Uint8Array(
-  await crypto.subtle.digest("SHA-256", new TextEncoder().encode(message))
+  await crypto.subtle.digest('SHA-256', new TextEncoder().encode(message)),
 );
 
 // Generate a secret key
@@ -76,11 +76,11 @@ In order to use Schnorr bindings import `mod-experimental.ts` instead of `mod.ts
 
 ```typescript
 // Import the experimental library
-import * as secp256k1 from "https://deno.land/x/libsecp256k1@0.0.1/mod-experimental.ts";
+import * as secp256k1 from 'https://deno.land/x/libsecp256k1@0.0.1/mod-experimental.ts';
 
 // Produce a tagged message hash
-const message = "Hello, Deno!";
-const tag = "BIP0340/challenge";
+const message = 'Hello, Deno!';
+const tag = 'BIP0340/challenge';
 const messageHash = secp256k1.taggedSha256(message, tag);
 
 // Generate a secret key

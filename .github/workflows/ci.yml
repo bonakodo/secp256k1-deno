@@ -19,7 +19,7 @@ jobs:
           deno-version: "v1.x"
 
       - name: Check Formatting
-        run: deno fmt --check
+        run: deno fmt --check --config deno.jsonc
 
   lint:
     runs-on: ubuntu-latest
@@ -33,7 +33,7 @@ jobs:
           deno-version: "v1.x"
 
       - name: Lint
-        run: deno lint
+        run: deno lint --config deno.jsonc
 
   test:
     runs-on: ubuntu-latest
