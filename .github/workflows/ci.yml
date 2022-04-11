@@ -37,6 +37,8 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    container:
+      image: ubuntu:impish
 
     steps:
       - name: Checkout repo
@@ -47,6 +49,8 @@ jobs:
         with:
           deno-version: "v1.x"
 
-      - name: Install libsecp256k1 and run tests
-        uses: docker://ubuntu:impish
-        run: apt-get install -y libsecp256k1-0 && deno test --unstable --allow-env --allow-ffi
+      - name: Install libsecp256k1
+        run: apt-get install -y libsecp256k1-0
+
+      - name: Run Tests
+        run: deno test --unstable --allow-env --allow-ffi
