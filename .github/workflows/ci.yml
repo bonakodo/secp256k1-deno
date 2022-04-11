@@ -53,9 +53,12 @@ jobs:
         run: |
           cd secp256k1
           ./autogen.sh
-          ./configure --enable-module-schnorrsig --enable-module-recovery
+          ./configure --enable-module-schnorrsig --enable-module-recovery --enable-tests=no
           make
           sudo make install
+          echo $LD_LIBRARY_PATH
 
       - name: Run Tests
+        env:
+          DENO_SECP256K1_PATH: /usr/local/lib/libsecp256k1.so
         run: deno test --unstable --allow-env --allow-ffi

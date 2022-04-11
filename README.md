@@ -12,7 +12,7 @@ This module doesn't come with the `libsecp256k1` library. You have to install it
 
 In Ubuntu or Debian run `apt-get install libsecp256k1-0`, in Alpine — `apk add libsecp256k1`.
 
-By default, the module will look for `secp256k1.dll` on Windows, `libsecp256k1.so.0` on Linux, or `libsecp256k1.dylib` on macOS in the library path. If the library is not in the dynamic library load path, you can specify the full path to the library in the `DENO_SECP256K1_PATH` environment variable.
+By default, the module will look for `secp256k1.dll` on Windows, `libsecp256k1.so` on Linux, or `libsecp256k1.dylib` on macOS in the library path. If the library is not in the dynamic library load path, you can specify the full path to the library in the `DENO_SECP256K1_PATH` environment variable.
 
 ## Required permissions and Deno flags
 
