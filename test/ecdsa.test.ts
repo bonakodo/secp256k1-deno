@@ -1,7 +1,7 @@
-import { assert, assertEquals, assertThrows, N } from "./deps.ts";
-import * as secp256k1 from "../src/lib.ts";
+import { assert, assertEquals, assertThrows, N } from './deps.ts';
+import * as secp256k1 from '../src/lib.ts';
 
-Deno.test("ecdsaSign", () => {
+Deno.test('ecdsaSign', () => {
   const messageHash = new Uint8Array(32);
   const secretKey = new Uint8Array(32);
   assertThrows(
@@ -9,16 +9,16 @@ Deno.test("ecdsaSign", () => {
       secp256k1.ecdsaSign(messageHash.slice(1), secretKey);
     },
     Error,
-    "The argument must be 32 bytes long",
-    "Should fail with the message hash of invalid length"
+    'The argument must be 32 bytes long',
+    'Should fail with the message hash of invalid length',
   );
   assertThrows(
     () => {
       secp256k1.ecdsaSign(messageHash, secretKey.slice(1));
     },
     Error,
-    "The argument must be 32 bytes long",
-    "Should fail with the secret key of invalid length"
+    'The argument must be 32 bytes long',
+    'Should fail with the secret key of invalid length',
   );
 
   assertThrows(
@@ -26,8 +26,8 @@ Deno.test("ecdsaSign", () => {
       secp256k1.ecdsaSign(messageHash, N());
     },
     Error,
-    "Could not sign the message",
-    "Should fail with the secret key equal to N"
+    'Could not sign the message',
+    'Should fail with the secret key equal to N',
   );
 
   assertThrows(
@@ -35,12 +35,12 @@ Deno.test("ecdsaSign", () => {
       secp256k1.ecdsaSign(messageHash, new Uint8Array(32));
     },
     Error,
-    "Could not sign the message",
-    "Should fail with all zeroes secret key"
+    'Could not sign the message',
+    'Should fail with all zeroes secret key',
   );
 });
 
-Deno.test("ecdsaVerify", () => {
+Deno.test('ecdsaVerify', () => {
   const secretKey = new Uint8Array(32);
   let messageHash = new Uint8Array(32);
   crypto.getRandomValues(secretKey);
@@ -51,19 +51,22 @@ Deno.test("ecdsaVerify", () => {
   assertEquals(
     false,
     secp256k1.ecdsaVerify(signature.slice(1), messageHash, publicKey),
-    "Should return false with a shorter signature"
+    'Should return false with a shorter signature',
   );
 
+  // deno-fmt-ignore
   messageHash = new Uint8Array([
     0xda, 0xde, 0x12, 0xe0, 0x6a, 0x5b, 0xbf, 0x5e, 0x11, 0x16, 0xf9, 0xbc,
     0x44, 0x99, 0x8b, 0x87, 0x68, 0x13, 0xe9, 0x48, 0xe1, 0x07, 0x07, 0xdc,
     0xb4, 0x80, 0x08, 0xa1, 0xda, 0xf3, 0x51, 0x2d,
   ]);
+  // deno-fmt-ignore
   publicKey = new Uint8Array([
     0x03, 0x76, 0xea, 0x9e, 0x36, 0xa7, 0x5d, 0x2e, 0xcf, 0x9c, 0x93, 0xa0,
     0xbe, 0x76, 0x88, 0x5e, 0x36, 0xf8, 0x22, 0x52, 0x9d, 0xb2, 0x2a, 0xcf,
     0xdc, 0x76, 0x1c, 0x9b, 0x5b, 0x45, 0x44, 0xf5, 0xc5,
   ]);
+  // deno-fmt-ignore
   signature = new Uint8Array([
     0xab, 0x4c, 0x6d, 0x9b, 0xa5, 0x1d, 0xa8, 0x30, 0x72, 0x61, 0x5c, 0x33,
     0xa9, 0x88, 0x7b, 0x75, 0x64, 0x78, 0xe6, 0xf9, 0xde, 0x38, 0x10, 0x85,
@@ -75,7 +78,7 @@ Deno.test("ecdsaVerify", () => {
   assert(secp256k1.ecdsaVerify(signature, messageHash, publicKey));
 });
 
-Deno.test("sign/verify", () => {
+Deno.test('sign/verify', () => {
   const secretKey = new Uint8Array(32);
   const messageHash = new Uint8Array(32);
   crypto.getRandomValues(secretKey);
@@ -84,6 +87,6 @@ Deno.test("sign/verify", () => {
   const publicKey = secp256k1.publicKeyCreate(secretKey);
   assert(
     secp256k1.ecdsaVerify(signature, messageHash, publicKey),
-    "Should successfully verify signature"
+    'Should successfully verify signature',
   );
 });

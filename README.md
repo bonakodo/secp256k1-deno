@@ -12,7 +12,7 @@ This module doesn't come with the `libsecp256k1` library. You have to install it
 
 In Ubuntu or Debian run `apt-get install libsecp256k1-0`, in Alpine — `apk add libsecp256k1`.
 
-By default, the module will look for `secp256k1.dll` on Windows, `libsecp256k1.so.0` on Linux, or `libsecp256k1.dylib` on macOS in the library path. If the library is not in the dynamic library load path, you can specify the full path to the library in the `DENO_SECP256K1_PATH` environment variable.
+By default, the module will look for `secp256k1.dll` on Windows, `libsecp256k1.so` on Linux, or `libsecp256k1.dylib` on macOS in the library path. If the library is not in the dynamic library load path, you can specify the full path to the library in the `DENO_SECP256K1_PATH` environment variable.
 
 ## Required permissions and Deno flags
 
@@ -25,12 +25,12 @@ To run the examples below, launch Deno as follows: `deno run --allow-ffi --allow
 
 ```typescript
 // Import the library
-import * as secp256k1 from "https://deno.land/x/libsecp256k1@0.0.1/mod.ts";
+import * as secp256k1 from 'https://deno.land/x/libsecp256k1@0.0.1/mod.ts';
 
 // Produce a message hash
-const message = "Hello, Deno!";
+const message = 'Hello, Deno!';
 const messageHash = new Uint8Array(
-  await crypto.subtle.digest("SHA-256", new TextEncoder().encode(message))
+  await crypto.subtle.digest('SHA-256', new TextEncoder().encode(message)),
 );
 
 // Generate a secret key
@@ -52,12 +52,12 @@ secp256k1.ecdsaVerify(signature, messageHash, publicKey);
 
 ## Schnorr signing and verification (experimental)
 
-Schnorr signing is experimental and must be explicitly enabled during `libsecp256k1` library build step by specifying the `--enable-schnorrsig` and `--enable-experimental` flags. This module provides bindings to the recoverable signing functions as well, therefore `--enable-module-recovery` is required as well.
+Schnorr signing is experimental and must be explicitly enabled during `libsecp256k1` library build step by specifying the `--enable-module-schnorrsig` flag. This deno module provides bindings to the recoverable signing functions as well, therefore `--enable-module-recovery` is mandatory too.
 
 Build the C library as follows:
 
 ```bash
-$ ./configure --enable-module-recovery --enable-schnorrsig --enable-experimental
+$ ./configure --enable-module-recovery --enable-module-schnorrsig
 $ make
 ```
 
@@ -76,11 +76,11 @@ To use Schnorr bindings import `mod-experimental.ts` instead of `mod.ts`.
 
 ```typescript
 // Import the experimental library
-import * as secp256k1 from "https://deno.land/x/libsecp256k1@0.0.1/mod-experimental.ts";
+import * as secp256k1 from 'https://deno.land/x/libsecp256k1@0.0.1/mod-experimental.ts';
 
 // Produce a tagged message hash
-const message = "Hello, Deno!";
-const tag = "BIP0340/challenge";
+const message = 'Hello, Deno!';
+const tag = 'BIP0340/challenge';
 const messageHash = secp256k1.taggedSha256(message, tag);
 
 // Generate a secret key
