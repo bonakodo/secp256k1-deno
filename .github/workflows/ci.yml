@@ -36,11 +36,7 @@ jobs:
         run: deno lint
 
   test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repo
@@ -50,6 +46,9 @@ jobs:
         uses: denoland/setup-deno@main
         with:
           deno-version: "v1.x"
+
+      - name: Install libsecp256k1
+        run: sudo apt-get install -y libsecp256k1-0
 
       - name: Run Tests
         run: deno test --unstable --allow-env --allow-ffi
