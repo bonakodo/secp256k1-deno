@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Install libsecp256k1 and unzip
-        run: apt-get install -y libsecp256k1-0 unzip
+        run: apt-get update && apt-get install -y libsecp256k1-0 unzip
 
       - name: Install Deno
         uses: denoland/setup-deno@main
