@@ -59,4 +59,4 @@ jobs:
       - name: Run Tests
         env:
           DENO_SECP256K1_PATH: secp256k1/.libs/libsecp256k1.so
-        run: deno test --unstable --allow-env --allow-ffi
+        run: deno test --unstable --allow-env=DENO_SECP256K1_PATH --allow-ffi

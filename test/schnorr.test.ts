@@ -1,5 +1,5 @@
 import { assertEquals, assertThrows } from './deps.ts';
-import * as secp256k1 from '../src/experimental/lib.ts';
+import * as secp256k1 from '../src/lib.ts';
 
 Deno.test('Random sign/verify', () => {
   const secretKey = new Uint8Array(32);

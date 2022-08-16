@@ -11,7 +11,9 @@ export function secp256k1_context_destroy(context: Context): void {
   lib.symbols.secp256k1_context_destroy(context);
 }
 
-export function secp256k1_context_preallocated_size(flags: number): number {
+export function secp256k1_context_preallocated_size(
+  flags: number,
+): number | bigint {
   return lib.symbols.secp256k1_context_preallocated_size(flags);
 }
 
@@ -273,5 +275,97 @@ export function secp256k1_ecdsa_verify(
 ): boolean {
   return Boolean(
     lib.symbols.secp256k1_ecdsa_verify(context, signature, msghash, pubkey),
+  );
+}
+
+export function secp256k1_tagged_sha256(
+  context: Context,
+  hash: Uint8Array,
+  tag: Uint8Array,
+  tagLength: number,
+  message: Uint8Array,
+  messageLength: number,
+): boolean {
+  return Boolean(
+    lib.symbols.secp256k1_tagged_sha256(
+      context,
+      hash,
+      tag,
+      tagLength,
+      message,
+      messageLength,
+    ),
+  );
+}
+
+export function secp256k1_keypair_xonly_pub(
+  context: Context,
+  pubkey: Uint8Array,
+  pk_parity: Uint8Array | null,
+  keypair: Uint8Array,
+): boolean {
+  return Boolean(
+    lib.symbols.secp256k1_keypair_xonly_pub(
+      context,
+      pubkey,
+      pk_parity,
+      keypair,
+    ),
+  );
+}
+
+export function secp256k1_xonly_pubkey_parse(
+  context: Context,
+  pubkey: Uint8Array,
+  input: Uint8Array,
+): boolean {
+  return Boolean(
+    lib.symbols.secp256k1_xonly_pubkey_parse(context, pubkey, input),
+  );
+}
+
+export function secp256k1_keypair_create(
+  context: Context,
+  keypair: Uint8Array,
+  secretKey: Uint8Array,
+): boolean {
+  return Boolean(
+    lib.symbols.secp256k1_keypair_create(context, keypair, secretKey),
+  );
+}
+
+export function secp256k1_schnorrsig_sign32(
+  context: Context,
+  signature: Uint8Array,
+  messageHash: Uint8Array,
+  keypair: Uint8Array,
+  aux_rand32: Uint8Array,
+): boolean {
+  return Boolean(
+    lib.symbols.secp256k1_schnorrsig_sign32(
+      context,
+      signature,
+      messageHash,
+      keypair,
+      aux_rand32,
+    ),
+  );
+}
+
+export function secp256k1_schnorrsig_verify(
+  context: Context,
+  signature: Uint8Array,
+  messageHash: Uint8Array,
+  messageLength: number,
+  publickey: Uint8Array,
+): boolean {
+  return Boolean(
+    lib.symbols.secp256k1_schnorrsig_verify(
+      context,
+      signature,
+      messageHash,
+      messageLength,
+      publickey,
+    ),
   );
 }

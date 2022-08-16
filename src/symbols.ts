@@ -1,4 +1,4 @@
-export type Context = Deno.UnsafePointer;
+export type Context = Deno.PointerValue;
 
 export const symbols = {
   /* Context (precomputed tables etc) */
@@ -212,5 +212,65 @@ export const symbols = {
       'pointer', /* const secp256k1_pubkey *pubkey */
     ],
     result: 'i32', /* int 0 or 1 */
+  },
+  /* Tagged SHA256 */
+  secp256k1_tagged_sha256: {
+    parameters: [
+      'pointer', /* const secp256k1_context* ctx */
+      'pointer', /* unsigned char *hash32 */
+      'pointer', /* const unsigned char *tag */
+      'usize', /* size_t taglen */
+      'pointer', /* const unsigned char *msg */
+      'usize', /* size_t msglen */
+    ],
+    result: 'i32',
+  },
+  /* Keypair */
+  secp256k1_keypair_create: {
+    parameters: [
+      'pointer', /* const secp256k1_context* ctx */
+      'pointer', /* secp256k1_keypair *keypair */
+      'pointer', /* const unsigned char *seckey32 */
+    ],
+    result: 'i32',
+  },
+  secp256k1_keypair_xonly_pub: {
+    parameters: [
+      'pointer', /* const secp256k1_context* ctx */
+      'pointer', /* secp256k1_xonly_pubkey *pubkey */
+      'pointer', /* int *pk_parity */
+      'pointer', /* const secp256k1_keypair *keypair */
+    ],
+    result: 'i32',
+  },
+  /* Public key */
+  secp256k1_xonly_pubkey_parse: {
+    parameters: [
+      'pointer', /* const secp256k1_context* ctx */
+      'pointer', /* secp256k1_xonly_pubkey *pubkey */
+      'pointer', /* const unsigned char *input32 */
+    ],
+    result: 'i32',
+  },
+  /* Schnorr */
+  secp256k1_schnorrsig_sign32: {
+    parameters: [
+      'pointer', /* const secp256k1_context* ctx */
+      'pointer', /* unsigned char *sig64 */
+      'pointer', /* const unsigned char *msg32 */
+      'pointer', /* const secp256k1_keypair *keypair */
+      'pointer', /* const unsigned char *aux_rand32 */
+    ],
+    result: 'i32',
+  },
+  secp256k1_schnorrsig_verify: {
+    parameters: [
+      'pointer', /* const secp256k1_context* ctx */
+      'pointer', /* const unsigned char *sig64 */
+      'pointer', /* const unsigned char *msg */
+      'usize', /* size_t msglen */
+      'pointer', /* const secp256k1_xonly_pubkey *pubkey */
+    ],
+    result: 'i32',
   },
 } as const;
