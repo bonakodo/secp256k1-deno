@@ -147,7 +147,7 @@ export function publicKeyTweakAdd(
   publicKey: Uint8Array,
   tweak: Uint8Array,
   compressed = true,
-) {
+): Uint8Array {
   const parsed = publicKeyParse(publicKey);
   const addResult = secp256k1.secp256k1_ec_pubkey_tweak_add(
     context,
@@ -165,7 +165,7 @@ export function publicKeyTweakMul(
   publicKey: Uint8Array,
   tweak: Uint8Array,
   compressed = true,
-) {
+): Uint8Array {
   const parsed = publicKeyParse(publicKey);
   const mulResult = secp256k1.secp256k1_ec_pubkey_tweak_mul(
     context,
