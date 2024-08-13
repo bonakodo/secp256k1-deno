@@ -1,4 +1,7 @@
 {
+  "name": "@bonakodo/secp256k1",
+  "version": "0.5.1",
+  "exports": "./mod.ts",
   "test": {
     "include": [
       "test/"
