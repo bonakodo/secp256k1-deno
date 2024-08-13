@@ -2,7 +2,7 @@
 
 This module provides Deno native bindings to [bitcoin-core/secp256k1](https://github.com/bitcoin-core/secp256k1).
 
-The module requires deno >= 1.13 as it uses [Foreign Function Interface API](https://deno.land/manual@v1.24.3/runtime/ffi_api) (FFI).
+The module requires deno >= 1.13 as it uses [Foreign Function Interface API](https://docs.deno.com/runtime/manual/runtime/ffi_api/) (FFI).
 
 By design, this module does not have any third-party Deno dependencies.
 
@@ -25,7 +25,7 @@ To run the examples below, launch Deno as follows: `deno run --allow-ffi --allow
 
 ```typescript
 // Import the library
-import * as secp256k1 from 'https://deno.land/x/libsecp256k1/mod.ts';
+import * as secp256k1 from 'jsr:@bonakodo/secp256k1';
 
 // Produce a message hash
 const message = 'Hello, Deno!';
@@ -73,8 +73,7 @@ Note that some Linux distributions build the `libsecp256k1` package with the exp
 | alphine:edge (20220328)   | :white_check_mark: | :x:                                                     |
 
 ```typescript
-// Import the experimental library
-import * as secp256k1 from 'https://deno.land/x/libsecp256k1/mod.ts';
+import * as secp256k1 from 'jsr:@bonakodo/secp256k1';
 
 // Produce a tagged message hash
 const message = 'Hello, Deno!';
@@ -102,4 +101,4 @@ secp256k1.schnorrVerify(signature, messageHash, publicKey);
 
 Check [LICENSE](./LICENSE) for details.
 
-Copyright © 2022 Bonakodo Limited
+Copyright © 2024 Bonakodo Limited
