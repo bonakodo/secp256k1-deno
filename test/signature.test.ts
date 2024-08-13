@@ -42,7 +42,7 @@ const signatureCompactHighS = new Uint8Array([
 
 Deno.test('signatureImport', () => {
   /* Invalid signature */
-  let signature = new Uint8Array();
+  let signature = new Uint8Array(1);
   assertThrows(
     () => {
       secp256k1.signatureImport(signature);

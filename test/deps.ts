@@ -3,7 +3,7 @@ export {
   assertEquals,
   assertNotEquals,
   assertThrows,
-} from 'https://deno.land/std@0.152.0/testing/asserts.ts';
+} from 'jsr:@std/assert@1';
 
 export const ONE = () => new Uint8Array(32).fill(1, 31, 32);
 // deno-fmt-ignore

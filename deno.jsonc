@@ -1,4 +1,9 @@
 {
+  "test": {
+    "include": [
+      "test/"
+    ]
+  },
   "fmt": {
     "options": {
       "indentWidth": 2,

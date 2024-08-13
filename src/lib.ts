@@ -45,7 +45,7 @@ function publicKeyParse(publicKey: Uint8Array): Uint8Array {
     context,
     output,
     publicKey,
-    publicKey.length,
+    BigInt(publicKey.length),
   );
   if (!parseResult) throw new Error('Invalid public key format');
   return output;
@@ -123,18 +123,19 @@ export function publicKeyCombine(
     throw new Error('32 bit architectures are not currently supported');
   }
 
+  const parsedKeys = publicKeys.map(publicKeyParse);
   const pointers = new BigUint64Array(
-    publicKeys.map((pk) => {
-      const key = publicKeyParse(pk);
-      return BigInt(Deno.UnsafePointer.of(key));
-    }),
+    parsedKeys.map((pk) =>
+      BigInt(Deno.UnsafePointer.value(Deno.UnsafePointer.of(pk)))
+    ),
   );
+
   const result = new Uint8Array(64);
   const combineResult = secp256k1.secp256k1_ec_pubkey_combine(
     context,
     result,
     pointers,
-    publicKeys.length,
+    BigInt(publicKeys.length),
   );
   if (!combineResult) throw new Error('Could not combine keys');
   return publicKeySerialize(result, compressed);
@@ -306,7 +307,7 @@ export function ecdsaVerify(
     context,
     parsedPublicKey,
     publicKey,
-    publicKey.length,
+    BigInt(publicKey.length),
   );
   if (!pubkeyParseResult) throw new Error('Could not parse the public key');
   return secp256k1.secp256k1_ecdsa_verify(
@@ -348,9 +349,9 @@ export function taggedSha256(
     context,
     hash,
     tag,
-    tag.length,
+    BigInt(tag.length),
     message,
-    message.length,
+    BigInt(message.length),
   );
   if (!hashResult) {
     throw new Error('Could not calculate the tagged SHA256 hash');
@@ -447,7 +448,7 @@ export function schnorrVerify(
     context,
     signature,
     messageHash,
-    32,
+    32n,
     xOnlyPublicKey,
   );
 }
