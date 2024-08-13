@@ -1,17 +1,18 @@
-name: CI
+name: Test
 
 on:
   push:
     branches: [master]
   pull_request:
     branches: [master]
+  workflow_call:
 
 jobs:
-  fmt:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Setup repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Setup Deno
         uses: denoland/setup-deno@main
@@ -21,33 +22,8 @@ jobs:
       - name: Check Formatting
         run: deno fmt --check --config deno.jsonc
 
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Setup repo
-        uses: actions/checkout@v2
-
-      - name: Setup Deno
-        uses: denoland/setup-deno@main
-        with:
-          deno-version: "v1.x"
-
       - name: Lint
         run: deno lint --config deno.jsonc
-
-  test:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Install Deno
-        uses: denoland/setup-deno@main
-        with:
-          deno-version: "v1.x"
-
-      - name: Checkout repo
-        uses: actions/checkout@v3
-        with:
-          submodules: true
 
       - name: Build libsecp256k1
         run: |
