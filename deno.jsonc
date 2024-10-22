@@ -1,6 +1,6 @@
 {
   "name": "@bonakodo/secp256k1",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "exports": "./src/lib.ts",
   "test": {
     "include": [

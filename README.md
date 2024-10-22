@@ -1,40 +1,91 @@
 # secp256k1-deno
 
-This module provides Deno native bindings to [bitcoin-core/secp256k1](https://github.com/bitcoin-core/secp256k1).
+Native bindings to [bitcoin-core/secp256k1](https://github.com/bitcoin-core/secp256k1) for Deno using native [Foreign Function Interface (FFI) API](https://docs.deno.com/runtime/reference/deno_namespace_apis/#ffi).
 
-The module requires deno >= 1.13 as it uses [Foreign Function Interface API](https://docs.deno.com/runtime/manual/runtime/ffi_api/) (FFI).
+This module has no third-party Deno dependencies except for testing.
 
-By design, this module does not have any third-party Deno dependencies.
+## Install libsecp256k1
 
-## Installation
+This module requires the `libsecp256k1` native library. Install it via your package manager or build it from source.
 
-This module doesn't come with the `libsecp256k1` library. You have to install it separately or [build from sources](https://github.com/bitcoin-core/secp256k1#build-steps) manually.
+### Install via Package Manager
 
-In Ubuntu or Debian run `apt-get install libsecp256k1-0`, in Alpine — `apk add libsecp256k1`.
+ * **Ubuntu/Debian**:
+ 
+ ```bash
+ sudo apt-get install libsecp256k1-0
+ ```
 
-By default, the module will look for `secp256k1.dll` on Windows, `libsecp256k1.so` on Linux, or `libsecp256k1.dylib` on macOS in the library path. If the library is not in the dynamic library load path, you can specify the full path to the library in the `DENO_SECP256K1_PATH` environment variable.
+ * **Alpine Linux**:
+ 
+ ```bash
+ sudo apk add libsecp256k1
+ ```
 
-## Required permissions and Deno flags
+ * **MacOS**:
+ 
+ ```bash
+ brew install secp256k1
+ ```
 
-This module uses FFI (unstable API), and therefore requires the `--allow-ffi` and `--unstable` flags.
-Additionally, to read the `DENO_SECP256K1_PATH` environment variable, it requires the `--allow-env` flag.
+**Note:** Some Linux distributions may provide `libsecp256k1` without certain modules (e.g., `--enable-module-schnorrsig`). In such cases, you need to build the library from source with the required modules enabled.
 
-To run the examples below, launch Deno as follows: `deno run --allow-ffi --allow-env=DENO_SECP256K1_PATH --unstable-ffi example.ts`
 
-## ECDSA signing and verification
+### Build from source
+
+Follow the [build steps](https://github.com/bitcoin-core/secp256k1?tab=readme-ov-file#building-with-autotools) in the bitcoin-core/secp256k1 repository. Ensure you enable the necessary modules:
+
+```bash
+./autogen.sh
+./configure --enable-module-schnorrsig
+make
+sudo make install
+```
+
+### Configure Library Path
+
+By default, the module searches for the library file:
+
+  * **Windows**: `secp256k1.dll`
+  * **Linux**: `libsecp256k1.so`
+  * **macOS**: `libsecp256k1.dylib`
+
+If the library is not in your system’s dynamic library load path, specify the full path using the `DENO_SECP256K1_PATH` environment variable:
+
+```bash
+# For example, on MacOS using Homebrew
+export DENO_SECP256K1_PATH=/opt/homebrew/lib/libsecp256k1.dylib
+```
+
+## Required Permissions
+
+This module requires the following Deno flags:
+
+ * `--allow-ffi`
+ * `--allow-env=DENO_SECP256K1_PATH`
+ 
+To run the examples below, use:
+
+```bash
+deno run --allow-ffi --allow-env=DENO_SECP256K1_PATH example.ts
+```
+
+## ECDSA Signing and Verification
 
 ```typescript
-// Import the library
+// example.ts
+
+// Import the module
 import * as secp256k1 from 'jsr:@bonakodo/secp256k1';
 
-// Produce a message hash
+// Prepare a message hash
 const message = 'Hello, Deno!';
-const messageHash = new Uint8Array(
-  await crypto.subtle.digest('SHA-256', new TextEncoder().encode(message)),
-);
+const encoder = new TextEncoder();
+const messageBytes = encoder.encode(message);
+const messageHash = new Uint8Array(await crypto.subtle.digest('SHA-256', messageBytes));
 
 // Generate a secret key
-const secretKey = new Uint8Array(32);
+let secretKey = new Uint8Array(32);
 do {
   crypto.getRandomValues(secretKey);
 } while (!secp256k1.secretKeyVerify(secretKey));
@@ -42,63 +93,44 @@ do {
 // Sign the message
 const signature = secp256k1.ecdsaSign(messageHash, secretKey);
 
-// Get a public key in compressed format
+// Get the public key in compressed format
 const publicKey = secp256k1.publicKeyCreate(secretKey);
 
 // Verify the signature
-secp256k1.ecdsaVerify(signature, messageHash, publicKey);
-// true
+const isValid = secp256k1.ecdsaVerify(signature, messageHash, publicKey);
+console.log(isValid); // true
 ```
 
-## Schnorr signing and verification (experimental)
-
-Schnorr signing must be enabled during `libsecp256k1` library build step by specifying the `--enable-module-schnorrsig` flag. This deno module provides bindings to the recoverable signing functions as well, therefore enabling `--enable-module-recovery` is mandatory too.
-
-Build the C library as follows:
-
-```bash
-$ ./configure --enable-module-recovery --enable-module-schnorrsig
-$ make
-```
-
-Note that some Linux distributions build the `libsecp256k1` package with the experimental flags enabled. Please refer to the table below.
-
-| Distribution (docker tag) | Recoverable        | Schnorr                                                 |
-| ------------------------- | ------------------ | ------------------------------------------------------- |
-| debian:bullseye           | :white_check_mark: | :white_check_mark:                                      |
-| ubuntu:focal              | :white_check_mark: | :x:                                                     |
-| ubuntu:impish             | :white_check_mark: | :white_check_mark:                                      |
-| ubuntu:jammy              | :white_check_mark: | :white_check_mark: (+ secp256k1_schnorrsig_sign_custom) |
-| alpine:3.15               | :white_check_mark: | :x:                                                     |
-| alphine:edge (20220328)   | :white_check_mark: | :x:                                                     |
+## Schnorr Signatures
 
 ```typescript
+// example.ts
 import * as secp256k1 from 'jsr:@bonakodo/secp256k1';
 
-// Produce a tagged message hash
+// Prepare a tagged message hash
 const message = 'Hello, Deno!';
 const tag = 'BIP0340/challenge';
 const messageHash = secp256k1.taggedSha256(message, tag);
 
 // Generate a secret key
-const secretKey = new Uint8Array(32);
+let secretKey = new Uint8Array(32);
 do {
   crypto.getRandomValues(secretKey);
 } while (!secp256k1.secretKeyVerify(secretKey));
 
-// Sign the message
+// Sign the message using Schnorr signatures
 const signature = secp256k1.schnorrSign(messageHash, secretKey);
 
-// Get a public key in x-only format
+// Get the public key in x-only format
 const publicKey = secp256k1.createXOnlyPublicKey(secretKey);
 
 // Verify the signature
-secp256k1.schnorrVerify(signature, messageHash, publicKey);
-// true
+const isValid = secp256k1.schnorrVerify(signature, messageHash, publicKey);
+console.log(isValid); // true
 ```
 
 ## License
 
-Check [LICENSE](./LICENSE) for details.
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
 
-Copyright © 2024 Bonakodo Limited
+© 2024 Bonakodo Limited
