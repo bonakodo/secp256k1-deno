@@ -1,6 +1,6 @@
 # secp256k1-deno
 
-Native bindings to [bitcoin-core/secp256k1](https://github.com/bitcoin-core/secp256k1) for Deno using native [Foreign Function Interface (FFI) API](https://docs.deno.com/runtime/reference/deno_namespace_apis/#ffi).
+Native bindings to [bitcoin-core/secp256k1](https://github.com/bitcoin-core/secp256k1) for Deno using [Foreign Function Interface (FFI) API](https://docs.deno.com/runtime/reference/deno_namespace_apis/#ffi).
 
 This module has no third-party Deno dependencies except for testing.
 
@@ -10,26 +10,25 @@ This module requires the `libsecp256k1` native library. Install it via your pack
 
 ### Install via Package Manager
 
- * **Ubuntu/Debian**:
- 
- ```bash
- sudo apt-get install libsecp256k1-0
- ```
+- **Ubuntu/Debian**:
 
- * **Alpine Linux**:
- 
- ```bash
- sudo apk add libsecp256k1
- ```
+```bash
+sudo apt-get install libsecp256k1-0
+```
 
- * **MacOS**:
- 
- ```bash
- brew install secp256k1
- ```
+- **Alpine Linux**:
+
+```bash
+sudo apk add libsecp256k1
+```
+
+- **MacOS**:
+
+```bash
+brew install secp256k1
+```
 
 **Note:** Some Linux distributions may provide `libsecp256k1` without certain modules (e.g., `--enable-module-schnorrsig`). In such cases, you need to build the library from source with the required modules enabled.
-
 
 ### Build from source
 
@@ -46,9 +45,9 @@ sudo make install
 
 By default, the module searches for the library file:
 
-  * **Windows**: `secp256k1.dll`
-  * **Linux**: `libsecp256k1.so`
-  * **macOS**: `libsecp256k1.dylib`
+- **Windows**: `secp256k1.dll`
+- **Linux**: `libsecp256k1.so`
+- **macOS**: `libsecp256k1.dylib`
 
 If the library is not in your system’s dynamic library load path, specify the full path using the `DENO_SECP256K1_PATH` environment variable:
 
@@ -61,9 +60,9 @@ export DENO_SECP256K1_PATH=/opt/homebrew/lib/libsecp256k1.dylib
 
 This module requires the following Deno flags:
 
- * `--allow-ffi`
- * `--allow-env=DENO_SECP256K1_PATH`
- 
+- `--allow-ffi`
+- `--allow-env=DENO_SECP256K1_PATH`
+
 To run the examples below, use:
 
 ```bash
@@ -82,7 +81,9 @@ import * as secp256k1 from 'jsr:@bonakodo/secp256k1';
 const message = 'Hello, Deno!';
 const encoder = new TextEncoder();
 const messageBytes = encoder.encode(message);
-const messageHash = new Uint8Array(await crypto.subtle.digest('SHA-256', messageBytes));
+const messageHash = new Uint8Array(
+  await crypto.subtle.digest('SHA-256', messageBytes),
+);
 
 // Generate a secret key
 let secretKey = new Uint8Array(32);
