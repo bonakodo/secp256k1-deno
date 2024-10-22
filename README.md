@@ -19,7 +19,7 @@ By default, the module will look for `secp256k1.dll` on Windows, `libsecp256k1.s
 This module uses FFI (unstable API), and therefore requires the `--allow-ffi` and `--unstable` flags.
 Additionally, to read the `DENO_SECP256K1_PATH` environment variable, it requires the `--allow-env` flag.
 
-To run the examples below, launch Deno as follows: `deno run --allow-ffi --allow-env=DENO_SECP256K1_PATH --unstable example.ts`
+To run the examples below, launch Deno as follows: `deno run --allow-ffi --allow-env=DENO_SECP256K1_PATH --unstable-ffi example.ts`
 
 ## ECDSA signing and verification
 
