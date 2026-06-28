@@ -206,6 +206,9 @@ Deno.test('public key compare, sort, and combine raw APIs', () => {
       ? pointerValue(pk1)
       : pointerValue(pk2);
     assert(ffi.secp256k1_ec_pubkey_sort(ctx, pointers, 2n));
+    assert(
+      ffi.secp256k1_ec_pubkey_sort(ctx, new Uint8Array(pointers.buffer), 2n),
+    );
     assertEquals(pointers[0], expectedFirst);
 
     const combined = u8(ffi.SECP256K1_PUBKEY_SIZE);
@@ -493,6 +496,42 @@ Deno.test('MuSig nonce, partial signature, and aggregate signature flow', () => 
     );
     const aggFull = u8(ffi.SECP256K1_PUBKEY_SIZE);
     assert(ffi.secp256k1_musig_pubkey_get(ctx, aggFull, keyaggCache));
+
+    const ecTweakedCache = keyaggCache.slice();
+    const ecTweakedPubkey = u8(ffi.SECP256K1_PUBKEY_SIZE);
+    assert(
+      ffi.secp256k1_musig_pubkey_ec_tweak_add(
+        ctx,
+        ecTweakedPubkey,
+        ecTweakedCache,
+        scalar(1),
+      ),
+    );
+    const xonlyTweakedCache = keyaggCache.slice();
+    const xonlyTweakedPubkey = u8(ffi.SECP256K1_PUBKEY_SIZE);
+    assert(
+      ffi.secp256k1_musig_pubkey_xonly_tweak_add(
+        ctx,
+        xonlyTweakedPubkey,
+        xonlyTweakedCache,
+        scalar(2),
+      ),
+    );
+
+    const counterSecnonce = u8(ffi.SECP256K1_MUSIG_SECNONCE_SIZE);
+    const counterPubnonce = u8(ffi.SECP256K1_MUSIG_PUBNONCE_SIZE);
+    assert(
+      ffi.secp256k1_musig_nonce_gen_counter(
+        ctx,
+        counterSecnonce,
+        counterPubnonce,
+        1n,
+        keypairs[0],
+        msg,
+        keyaggCache,
+        null,
+      ),
+    );
 
     const secnonces = [u8(ffi.SECP256K1_MUSIG_SECNONCE_SIZE), u8(132)];
     const pubnonces = [u8(ffi.SECP256K1_MUSIG_PUBNONCE_SIZE), u8(132)];

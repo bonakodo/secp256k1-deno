@@ -414,7 +414,10 @@ if (envSecp256k1Path !== undefined) {
       symbols,
     ).symbols;
   } catch (e) {
-    if (e instanceof Deno.errors.PermissionDenied) {
+    if (
+      e instanceof Deno.errors.PermissionDenied ||
+      e instanceof Deno.errors.NotCapable
+    ) {
       throw e;
     }
 
@@ -444,8 +447,7 @@ function asPointerBytes(pointers: PointerArray): Uint8Array {
 }
 
 function dereferenceStaticPointer(pointer: Pointer): Pointer {
-  if (pointer === null) return null;
-  return new Deno.UnsafePointerView(pointer).getPointer(0);
+  return new Deno.UnsafePointerView(pointer!).getPointer(0);
 }
 
 export const secp256k1_context_static = dereferenceStaticPointer(

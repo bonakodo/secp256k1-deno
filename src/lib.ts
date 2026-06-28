@@ -6,17 +6,25 @@ const SECP256K1_EC_UNCOMPRESSED = 2;
 const context = secp256k1.secp256k1_context_create(769); // SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY
 const randomize = new Uint8Array(32);
 crypto.getRandomValues(randomize);
-if (!secp256k1.secp256k1_context_randomize(context, randomize)) {
-  throw new Error('Could not randomize secp256k1 context');
+assertNative(
+  secp256k1.secp256k1_context_randomize(context, randomize),
+  'Could not randomize secp256k1 context',
+);
+
+function assertNative(condition: boolean, message: string): void {
+  if (!condition) {
+    throw new Error(message);
+  }
 }
 
 export function contextRandomize(seed: Uint8Array | null): void {
   if (seed !== null) {
     assertLength(32, seed);
   }
-  if (!secp256k1.secp256k1_context_randomize(context, seed)) {
-    throw new Error('Could not randomize secp256k1 context');
-  }
+  assertNative(
+    secp256k1.secp256k1_context_randomize(context, seed),
+    'Could not randomize secp256k1 context',
+  );
 }
 
 /* Secret key functions */
@@ -81,7 +89,7 @@ function publicKeySerialize(
     parsedPublicKey,
     flags,
   );
-  if (!serializeResult) throw new Error('Could not serialize public key');
+  assertNative(serializeResult, 'Could not serialize public key');
   return output;
 }
 
@@ -104,7 +112,7 @@ export function publicKeyCreate(
     publicKey,
     secretKey,
   );
-  if (!createResult) throw new Error('Could not create a public key');
+  assertNative(createResult, 'Could not create a public key');
   return publicKeySerialize(publicKey, compressed);
 }
 export function publicKeyConvert(
@@ -121,7 +129,7 @@ export function publicKeyNegate(
 ): Uint8Array {
   const parsed = publicKeyParse(publicKey);
   const negateResult = secp256k1.secp256k1_ec_pubkey_negate(context, parsed); // mutates `parsed`
-  if (!negateResult) throw new Error('Failed to negate the public key');
+  assertNative(negateResult, 'Failed to negate the public key');
   return publicKeySerialize(parsed, compressed);
 }
 
@@ -149,7 +157,7 @@ export function publicKeyCombine(
     pointers,
     BigInt(publicKeys.length),
   );
-  if (!combineResult) throw new Error('Could not combine keys');
+  assertNative(combineResult, 'Could not combine keys');
   return publicKeySerialize(result, compressed);
 }
 /**
@@ -166,7 +174,7 @@ export function publicKeyTweakAdd(
     parsed, // mutates `parsed`
     tweak,
   );
-  if (!addResult) throw new Error('Could not add the tweak to the public key');
+  assertNative(addResult, 'Could not add the tweak to the public key');
   return publicKeySerialize(parsed, compressed);
 }
 
@@ -184,9 +192,7 @@ export function publicKeyTweakMul(
     parsed, // mutates `parsed`
     tweak,
   );
-  if (!mulResult) {
-    throw new Error('Could not multiply the public key by the tweak');
-  }
+  assertNative(mulResult, 'Could not multiply the public key by the tweak');
   return publicKeySerialize(parsed, compressed);
 }
 
@@ -205,7 +211,7 @@ export function signatureNormalize(signature: CompactSignature): Uint8Array {
     parsedSignature,
     signature,
   );
-  if (!parseResult) throw new Error('Could not parse the compact signature');
+  assertNative(parseResult, 'Could not parse the compact signature');
   const normalizedSignature = new Uint8Array(64);
   secp256k1.secp256k1_ecdsa_signature_normalize(
     context,
@@ -217,9 +223,10 @@ export function signatureNormalize(signature: CompactSignature): Uint8Array {
     signature,
     normalizedSignature,
   );
-  if (!serializeResult) {
-    throw new Error('Could not serialize the signature to the compact format');
-  }
+  assertNative(
+    serializeResult,
+    'Could not serialize the signature to the compact format',
+  );
   return signature;
 }
 
@@ -234,7 +241,7 @@ export function signatureExport(signature: CompactSignature): Uint8Array {
     parsedSignature,
     signature,
   );
-  if (!parseResult) throw new Error('Could not parse the signature');
+  assertNative(parseResult, 'Could not parse the signature');
   const result = new Uint8Array(72);
   const resultLength = new BigUint64Array([72n]); // size_t is 64 bits
   const serializeResult = secp256k1.secp256k1_ecdsa_signature_serialize_der(
@@ -243,9 +250,10 @@ export function signatureExport(signature: CompactSignature): Uint8Array {
     resultLength,
     parsedSignature,
   );
-  if (!serializeResult) {
-    throw new Error('Could not serialize the signature to the DER format');
-  }
+  assertNative(
+    serializeResult,
+    'Could not serialize the signature to the DER format',
+  );
   return result.slice(0, Number(resultLength[0]));
 }
 
@@ -258,16 +266,14 @@ export function signatureImport(signature: DerSignature): CompactSignature {
     signature,
     signature.length,
   );
-  if (!parseResult) {
-    throw new Error('Could not parse the signature in DER format');
-  }
+  assertNative(parseResult, 'Could not parse the signature in DER format');
   const result = new Uint8Array(64);
   const serializeResult = secp256k1.secp256k1_ecdsa_signature_serialize_compact(
     context,
     result,
     parsedSignature,
   );
-  if (!serializeResult) throw new Error('Could not serialize signature');
+  assertNative(serializeResult, 'Could not serialize signature');
   return result;
 }
 
@@ -285,14 +291,14 @@ export function ecdsaSign(
     null,
     null,
   );
-  if (!signResult) throw new Error('Could not sign the message');
+  assertNative(signResult, 'Could not sign the message');
   const result = new Uint8Array(64);
   const serializeResult = secp256k1.secp256k1_ecdsa_signature_serialize_compact(
     context,
     result,
     signature,
   );
-  if (!serializeResult) throw new Error('Could not serialize signature');
+  assertNative(serializeResult, 'Could not serialize signature');
   return result;
 }
 
@@ -310,7 +316,7 @@ export function ecdsaSignRecoverable(
     null,
     null,
   );
-  if (!signResult) throw new Error('Could not sign the message');
+  assertNative(signResult, 'Could not sign the message');
 
   const signature = new Uint8Array(64);
   const recid = new Uint8Array(4);
@@ -321,7 +327,7 @@ export function ecdsaSignRecoverable(
       recid,
       recoverableSignature,
     );
-  if (!serializeResult) throw new Error('Could not serialize signature');
+  assertNative(serializeResult, 'Could not serialize signature');
   return {
     signature,
     recid: new DataView(recid.buffer).getInt32(0, true),
@@ -342,9 +348,7 @@ export function ecdsaVerify(
       parsedSignature,
       signature,
     );
-  if (!signatureParseResult) {
-    throw new Error('Could not parse compact signature');
-  }
+  assertNative(signatureParseResult, 'Could not parse compact signature');
   const parsedPublicKey = new Uint8Array(64);
   const pubkeyParseResult = secp256k1.secp256k1_ec_pubkey_parse(
     context,
@@ -352,7 +356,7 @@ export function ecdsaVerify(
     publicKey,
     BigInt(publicKey.length),
   );
-  if (!pubkeyParseResult) throw new Error('Could not parse the public key');
+  assertNative(pubkeyParseResult, 'Could not parse the public key');
   return secp256k1.secp256k1_ecdsa_verify(
     context,
     parsedSignature,
@@ -381,9 +385,7 @@ export function ecdsaRecover(
       signature,
       recid,
     );
-  if (!parseResult) {
-    throw new Error('Could not parse the recoverable signature');
-  }
+  assertNative(parseResult, 'Could not parse the recoverable signature');
 
   const publicKey = new Uint8Array(64);
   const recoverResult = secp256k1.secp256k1_ecdsa_recover(
@@ -392,7 +394,7 @@ export function ecdsaRecover(
     recoverableSignature,
     messageHash,
   );
-  if (!recoverResult) throw new Error('Could not recover the public key');
+  assertNative(recoverResult, 'Could not recover the public key');
   return publicKeySerialize(publicKey, compressed);
 }
 
@@ -411,9 +413,7 @@ export function ecdh(
     null,
     null,
   );
-  if (!ecdhResult) {
-    throw new Error('Could not compute the ECDH shared secret');
-  }
+  assertNative(ecdhResult, 'Could not compute the ECDH shared secret');
   return output;
 }
 
@@ -427,9 +427,7 @@ export function keypairCreate(secretKey: Uint8Array): Uint8Array {
     keypair,
     secretKey,
   );
-  if (!createResult) {
-    throw new Error('Could not create a key pair from the secret key');
-  }
+  assertNative(createResult, 'Could not create a key pair from the secret key');
   return keypair;
 }
 
@@ -452,9 +450,7 @@ export function taggedSha256(
     message,
     BigInt(message.length),
   );
-  if (!hashResult) {
-    throw new Error('Could not calculate the tagged SHA256 hash');
-  }
+  assertNative(hashResult, 'Could not calculate the tagged SHA256 hash');
   return hash;
 }
 
@@ -468,11 +464,10 @@ export function convertToXOnlyPublicKey(
     xOnlyPublicKey,
     compressedPublicKey,
   );
-  if (!parseResult) {
-    throw new Error(
-      'Could not convert the serialized public key to x-only public key',
-    );
-  }
+  assertNative(
+    parseResult,
+    'Could not convert the serialized public key to x-only public key',
+  );
   return xOnlyPublicKey;
 }
 
@@ -484,9 +479,7 @@ export function createXOnlyPublicKey(secretKey: Uint8Array): XOnlyPubkey {
     keypair,
     secretKey,
   );
-  if (!createResult) {
-    throw new Error('Could not create a key pair from the secret key');
-  }
+  assertNative(createResult, 'Could not create a key pair from the secret key');
   const xOnlyPublicKey = new Uint8Array(64);
   const xOnlyResult = secp256k1.secp256k1_keypair_xonly_pub(
     context,
@@ -494,9 +487,7 @@ export function createXOnlyPublicKey(secretKey: Uint8Array): XOnlyPubkey {
     null,
     keypair,
   );
-  if (!xOnlyResult) {
-    throw new Error('Could not create a key pair from the secret key');
-  }
+  assertNative(xOnlyResult, 'Could not create a key pair from the secret key');
   return xOnlyPublicKey;
 }
 
@@ -519,9 +510,10 @@ export function schnorrSign(
     keypair,
     secretKey,
   );
-  if (!keypairCreateResult) {
-    throw new Error('Could not create a keypair from the secret key');
-  }
+  assertNative(
+    keypairCreateResult,
+    'Could not create a keypair from the secret key',
+  );
 
   const signature = new Uint8Array(64);
   const signResult = secp256k1.secp256k1_schnorrsig_sign32(
@@ -531,7 +523,7 @@ export function schnorrSign(
     keypair,
     auxiliaryRandom,
   );
-  if (!signResult) throw new Error('Could not sign with Schnorr');
+  assertNative(signResult, 'Could not sign with Schnorr');
   return signature;
 }
 
