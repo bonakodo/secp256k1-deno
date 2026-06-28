@@ -1,4 +1,11 @@
-import { assertEquals, assertThrows, N, ONE } from './deps.ts';
+import {
+  assertEquals,
+  assertThrows,
+  HALF_N,
+  HALF_N_PLUS_ONE,
+  N,
+  ONE,
+} from './deps.ts';
 import * as secp256k1 from '../src/lib.ts';
 
 // fixtures from https://github.com/bitjson/libauth/blob/d04d353019f4710de43f3a527d2d1089a23adb21/src/lib/crypto/secp256k1.spec.ts#L38
@@ -89,6 +96,29 @@ Deno.test('signatureExport', () => {
 });
 
 Deno.test('signatureNormalize', () => {
+  assertThrows(
+    () => {
+      secp256k1.signatureNormalize(Uint8Array.from([...N(), ...ONE()]));
+    },
+    Error,
+    'Could not parse the compact signature',
+    'Should throw error for signature with r equal to N',
+  );
+
+  const halfN = Uint8Array.from([...ONE(), ...HALF_N()]);
+  assertEquals(
+    secp256k1.signatureNormalize(halfN.slice()),
+    halfN,
+    'A signature with s equal to N/2 should not change',
+  );
+
+  const halfNPlusOne = Uint8Array.from([...ONE(), ...HALF_N_PLUS_ONE()]);
+  assertEquals(
+    secp256k1.signatureNormalize(halfNPlusOne),
+    halfN,
+    'A signature with s equal to N/2 + 1 should normalize to N/2',
+  );
+
   const normalized = secp256k1.signatureNormalize(
     Uint8Array.from([...signatureCompactHighS]),
   );

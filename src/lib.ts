@@ -10,6 +10,15 @@ if (!secp256k1.secp256k1_context_randomize(context, randomize)) {
   throw new Error('Could not randomize secp256k1 context');
 }
 
+export function contextRandomize(seed: Uint8Array | null): void {
+  if (seed !== null) {
+    assertLength(32, seed);
+  }
+  if (!secp256k1.secp256k1_context_randomize(context, seed)) {
+    throw new Error('Could not randomize secp256k1 context');
+  }
+}
+
 /* Secret key functions */
 export function secretKeyVerify(secretKey: Uint8Array): boolean {
   assertLength(32, secretKey);
@@ -106,11 +115,14 @@ export function publicKeyConvert(
   return publicKeySerialize(parsed, compressed);
 }
 
-export function publicKeyNegate(publicKey: Uint8Array): Uint8Array {
+export function publicKeyNegate(
+  publicKey: Uint8Array,
+  compressed = true,
+): Uint8Array {
   const parsed = publicKeyParse(publicKey);
   const negateResult = secp256k1.secp256k1_ec_pubkey_negate(context, parsed); // mutates `parsed`
   if (!negateResult) throw new Error('Failed to negate the public key');
-  return parsed;
+  return publicKeySerialize(parsed, compressed);
 }
 
 export function publicKeyCombine(
@@ -195,12 +207,11 @@ export function signatureNormalize(signature: CompactSignature): Uint8Array {
   );
   if (!parseResult) throw new Error('Could not parse the compact signature');
   const normalizedSignature = new Uint8Array(64);
-  const normalizeResult = secp256k1.secp256k1_ecdsa_signature_normalize(
+  secp256k1.secp256k1_ecdsa_signature_normalize(
     context,
     normalizedSignature,
     parsedSignature,
   );
-  if (!normalizeResult) throw new Error('Could not normalize the signature');
   const serializeResult = secp256k1.secp256k1_ecdsa_signature_serialize_compact(
     context,
     signature,
@@ -285,6 +296,38 @@ export function ecdsaSign(
   return result;
 }
 
+export function ecdsaSignRecoverable(
+  messageHash: Uint8Array,
+  secretKey: Uint8Array,
+): { signature: CompactSignature; recid: number } {
+  assertLength(32, secretKey, messageHash);
+  const recoverableSignature = new Uint8Array(65);
+  const signResult = secp256k1.secp256k1_ecdsa_sign_recoverable(
+    context,
+    recoverableSignature,
+    messageHash,
+    secretKey,
+    null,
+    null,
+  );
+  if (!signResult) throw new Error('Could not sign the message');
+
+  const signature = new Uint8Array(64);
+  const recid = new Uint8Array(4);
+  const serializeResult = secp256k1
+    .secp256k1_ecdsa_recoverable_signature_serialize_compact(
+      context,
+      signature,
+      recid,
+      recoverableSignature,
+    );
+  if (!serializeResult) throw new Error('Could not serialize signature');
+  return {
+    signature,
+    recid: new DataView(recid.buffer).getInt32(0, true),
+  };
+}
+
 export function ecdsaVerify(
   signature: CompactSignature,
   messageHash: Uint8Array,
@@ -316,6 +359,62 @@ export function ecdsaVerify(
     messageHash,
     parsedPublicKey,
   );
+}
+
+export function ecdsaRecover(
+  signature: CompactSignature,
+  recid: number,
+  messageHash: Uint8Array,
+  compressed = true,
+): Uint8Array {
+  assertLength(64, signature);
+  assertLength(32, messageHash);
+  if (!Number.isInteger(recid) || recid < 0 || recid > 3) {
+    throw new Error('The recovery id must be an integer between 0 and 3');
+  }
+
+  const recoverableSignature = new Uint8Array(65);
+  const parseResult = secp256k1
+    .secp256k1_ecdsa_recoverable_signature_parse_compact(
+      context,
+      recoverableSignature,
+      signature,
+      recid,
+    );
+  if (!parseResult) {
+    throw new Error('Could not parse the recoverable signature');
+  }
+
+  const publicKey = new Uint8Array(64);
+  const recoverResult = secp256k1.secp256k1_ecdsa_recover(
+    context,
+    publicKey,
+    recoverableSignature,
+    messageHash,
+  );
+  if (!recoverResult) throw new Error('Could not recover the public key');
+  return publicKeySerialize(publicKey, compressed);
+}
+
+export function ecdh(
+  publicKey: Uint8Array,
+  secretKey: Uint8Array,
+): Uint8Array {
+  const parsedPublicKey = publicKeyParse(publicKey);
+  assertLength(32, secretKey);
+  const output = new Uint8Array(32);
+  const ecdhResult = secp256k1.secp256k1_ecdh(
+    context,
+    output,
+    parsedPublicKey,
+    secretKey,
+    null,
+    null,
+  );
+  if (!ecdhResult) {
+    throw new Error('Could not compute the ECDH shared secret');
+  }
+  return output;
 }
 
 export type XOnlyPubkey = Uint8Array;

@@ -90,3 +90,79 @@ Deno.test('sign/verify', () => {
     'Should successfully verify signature',
   );
 });
+
+Deno.test('ecdsaVerify returns false for altered valid inputs', () => {
+  const secretKey = new Uint8Array(32);
+  secretKey[31] = 5;
+  const messageHash = new Uint8Array(32).fill(6);
+  const signature = secp256k1.ecdsaSign(messageHash, secretKey);
+  const publicKey = secp256k1.publicKeyCreate(secretKey);
+
+  const changedMessage = messageHash.slice();
+  changedMessage[0] ^= 0x01;
+  assertEquals(
+    false,
+    secp256k1.ecdsaVerify(signature, changedMessage, publicKey),
+    'Should return false for a changed message',
+  );
+
+  const zeroR = signature.slice();
+  zeroR.fill(0, 0, 32);
+  assertEquals(
+    false,
+    secp256k1.ecdsaVerify(zeroR, messageHash, publicKey),
+    'Should return false for a signature with zero r',
+  );
+
+  const zeroS = signature.slice();
+  zeroS.fill(0, 32, 64);
+  assertEquals(
+    false,
+    secp256k1.ecdsaVerify(zeroS, messageHash, publicKey),
+    'Should return false for a signature with zero s',
+  );
+});
+
+Deno.test('ecdsaSignRecoverable and ecdsaRecover', () => {
+  const secretKey = new Uint8Array(32);
+  secretKey[31] = 7;
+  const messageHash = new Uint8Array(32).fill(8);
+  const { signature, recid } = secp256k1.ecdsaSignRecoverable(
+    messageHash,
+    secretKey,
+  );
+  const publicKey = secp256k1.publicKeyCreate(secretKey);
+  const publicKeyUncompressed = secp256k1.publicKeyCreate(secretKey, false);
+
+  assert(secp256k1.ecdsaVerify(signature, messageHash, publicKey));
+  assertEquals(
+    secp256k1.ecdsaRecover(signature, recid, messageHash),
+    publicKey,
+  );
+  assertEquals(
+    secp256k1.ecdsaRecover(signature, recid, messageHash, false),
+    publicKeyUncompressed,
+  );
+
+  assertThrows(
+    () => secp256k1.ecdsaRecover(signature, 4, messageHash),
+    Error,
+    'The recovery id must be an integer between 0 and 3',
+  );
+
+  const zeroR = signature.slice();
+  zeroR.fill(0, 0, 32);
+  assertThrows(
+    () => secp256k1.ecdsaRecover(zeroR, recid, messageHash),
+    Error,
+    'Could not recover the public key',
+  );
+
+  const zeroS = signature.slice();
+  zeroS.fill(0, 32, 64);
+  assertThrows(
+    () => secp256k1.ecdsaRecover(zeroS, recid, messageHash),
+    Error,
+    'Could not recover the public key',
+  );
+});

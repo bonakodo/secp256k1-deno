@@ -1,4 +1,12 @@
-import { assertEquals, assertNotEquals, assertThrows, N, ONE } from './deps.ts';
+import {
+  assertEquals,
+  assertNotEquals,
+  assertThrows,
+  N,
+  N_BIGINT,
+  ONE,
+  scalarFromBigInt,
+} from './deps.ts';
 import * as secp256k1 from '../src/lib.ts';
 
 Deno.test('secretKeyVerify', () => {
@@ -101,6 +109,22 @@ Deno.test('secretKeyTweakAdd', () => {
     new Uint8Array(32).fill(2, 31, 32),
     'One plus one should equal two',
   );
+
+  for (
+    const [secretValue, tweakValue] of [
+      [3n, 4n],
+      [N_BIGINT - 2n, 1n],
+    ]
+  ) {
+    secretKey = scalarFromBigInt(secretValue);
+    tweak = scalarFromBigInt(tweakValue);
+    assertEquals(true, secp256k1.secretKeyTweakAdd(secretKey, tweak));
+    assertEquals(
+      secretKey,
+      scalarFromBigInt((secretValue + tweakValue) % N_BIGINT),
+      'Tweak add should match scalar addition modulo N',
+    );
+  }
 });
 
 Deno.test('secretKeyTweakMul', () => {
@@ -127,4 +151,20 @@ Deno.test('secretKeyTweakMul', () => {
     secp256k1.secretKeyTweakMul(secretKey, new Uint8Array(32)),
     'Should fail when tweak equals zero',
   );
+
+  for (
+    const [secretValue, tweakValue] of [
+      [3n, 4n],
+      [N_BIGINT - 2n, 2n],
+    ]
+  ) {
+    secretKey = scalarFromBigInt(secretValue);
+    tweak = scalarFromBigInt(tweakValue);
+    assertEquals(true, secp256k1.secretKeyTweakMul(secretKey, tweak));
+    assertEquals(
+      secretKey,
+      scalarFromBigInt((secretValue * tweakValue) % N_BIGINT),
+      'Tweak mul should match scalar multiplication modulo N',
+    );
+  }
 });
