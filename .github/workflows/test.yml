@@ -29,12 +29,22 @@ jobs:
 
       - name: Build libsecp256k1
         run: |
-          cd secp256k1
-          ./autogen.sh
-          ./configure --enable-module-schnorrsig --enable-module-recovery --enable-tests=no --enable-benchmark=no
-          make
+          cmake -S secp256k1 -B secp256k1/build-deno \
+            -DBUILD_SHARED_LIBS=ON \
+            -DSECP256K1_ENABLE_MODULE_RECOVERY=ON \
+            -DSECP256K1_ENABLE_MODULE_ECDH=ON \
+            -DSECP256K1_ENABLE_MODULE_EXTRAKEYS=ON \
+            -DSECP256K1_ENABLE_MODULE_SCHNORRSIG=ON \
+            -DSECP256K1_ENABLE_MODULE_ELLSWIFT=ON \
+            -DSECP256K1_ENABLE_MODULE_MUSIG=ON \
+            -DSECP256K1_BUILD_BENCHMARK=OFF \
+            -DSECP256K1_BUILD_TESTS=OFF \
+            -DSECP256K1_BUILD_EXHAUSTIVE_TESTS=OFF \
+            -DSECP256K1_BUILD_CTIME_TESTS=OFF \
+            -DSECP256K1_BUILD_EXAMPLES=OFF
+          cmake --build secp256k1/build-deno -j
 
       - name: Run Tests
         env:
-          DENO_SECP256K1_PATH: secp256k1/.libs/libsecp256k1.so
-        run: deno test --unstable-ffi --allow-env=DENO_SECP256K1_PATH --allow-ffi
+          DENO_SECP256K1_PATH: secp256k1/build-deno/lib/libsecp256k1.so
+        run: deno test --allow-env=DENO_SECP256K1_PATH --allow-ffi --allow-read=secp256k1
