@@ -13,6 +13,7 @@ import {
 } from '../src/native/loader.ts';
 import {
   CAPABILITY_SYMBOLS,
+  dereferenceStaticPointer,
   type NativeCapability,
   nativeSymbolDefinitions,
   type NativeSymbols,
@@ -27,12 +28,44 @@ import {
   createNativeContextHelpers,
   type NativeContextRuntime,
   SECP256K1_CONTEXT_NONE,
+  withSigningContext,
+  withStaticContext,
 } from '../src/native/context.ts';
+import * as publicNative from '../src/native/mod.ts';
 
 const LINUX_X64: NativeTarget = { os: 'linux', arch: 'x86_64' };
 const LINUX_ARM64: NativeTarget = { os: 'linux', arch: 'aarch64' };
 const MACOS_X64: NativeTarget = { os: 'darwin', arch: 'x86_64' };
 const MACOS_ARM64: NativeTarget = { os: 'darwin', arch: 'aarch64' };
+
+function verifyContextCallbackTypes(
+  helpers: ReturnType<typeof createNativeContextHelpers>,
+): void {
+  // @ts-expect-error Native context pointers must not escape the callback.
+  helpers.withSigningContext((context) => context);
+  // @ts-expect-error Promises outlive the synchronously destroyed context.
+  helpers.withSigningContext(async () => {
+    await Promise.resolve();
+    return 42;
+  });
+  const thenable = Promise.resolve(42) as PromiseLike<number>;
+  // @ts-expect-error Thenables outlive the synchronously destroyed context.
+  helpers.withStaticContext(() => thenable);
+  // @ts-expect-error Internal singleton helpers also forbid pointer escape.
+  withSigningContext((context) => context);
+  // @ts-expect-error Internal singleton helpers also forbid async callbacks.
+  withStaticContext(async () => {
+    await Promise.resolve();
+    return 42;
+  });
+}
+
+void verifyContextCallbackTypes;
+
+Deno.test('public native module does not expose raw FFI access', () => {
+  assert(!('getNativeSymbols' in publicNative));
+  assert(!('requireCapability' in publicNative));
+});
 
 Deno.test('native config requires an exact auto value or absolute path', () => {
   for (
@@ -132,6 +165,307 @@ Deno.test('native config errors preserve their structured cause', () => {
   assertEquals(error.name, 'NativeConfigError');
   assertEquals(error.code, 'environment-unavailable');
 });
+
+const EXPECTED_NATIVE_ABI6 = {
+  secp256k1_context_static: { type: 'pointer', optional: true },
+  secp256k1_selftest: {
+    parameters: [],
+    result: 'void',
+    optional: true,
+  },
+  secp256k1_context_create: {
+    parameters: ['u32'],
+    result: 'pointer',
+    optional: true,
+  },
+  secp256k1_context_destroy: {
+    parameters: ['pointer'],
+    result: 'void',
+    optional: true,
+  },
+  secp256k1_context_randomize: {
+    parameters: ['pointer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ec_seckey_verify: {
+    parameters: ['pointer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ec_seckey_negate: {
+    parameters: ['pointer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ec_seckey_tweak_add: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ec_pubkey_parse: {
+    parameters: ['pointer', 'buffer', 'buffer', 'usize'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ec_pubkey_serialize: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer', 'u32'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ec_pubkey_create: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ec_pubkey_negate: {
+    parameters: ['pointer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ec_pubkey_combine: {
+    parameters: ['pointer', 'buffer', 'buffer', 'usize'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ec_pubkey_tweak_add: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ecdsa_signature_parse_compact: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ecdsa_signature_serialize_compact: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ecdsa_signature_parse_der: {
+    parameters: ['pointer', 'buffer', 'buffer', 'usize'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ecdsa_signature_serialize_der: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ecdsa_signature_normalize: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ecdsa_sign: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer', 'pointer', 'pointer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ecdsa_verify: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_tagged_sha256: {
+    parameters: ['pointer', 'buffer', 'buffer', 'usize', 'buffer', 'usize'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_xonly_pubkey_parse: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_xonly_pubkey_serialize: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_xonly_pubkey_cmp: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_xonly_pubkey_from_pubkey: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_xonly_pubkey_tweak_add: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_xonly_pubkey_tweak_add_check: {
+    parameters: ['pointer', 'buffer', 'i32', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_keypair_create: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_keypair_sec: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_keypair_pub: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_keypair_xonly_pub: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_keypair_xonly_tweak_add: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_schnorrsig_sign32: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_schnorrsig_verify: {
+    parameters: ['pointer', 'buffer', 'buffer', 'usize', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ellswift_create: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ellswift_xdh: {
+    parameters: [
+      'pointer',
+      'buffer',
+      'buffer',
+      'buffer',
+      'buffer',
+      'i32',
+      'pointer',
+      'pointer',
+    ],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_ellswift_xdh_hash_function_bip324: {
+    type: 'pointer',
+    optional: true,
+  },
+  secp256k1_musig_pubnonce_parse: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_pubnonce_serialize: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_aggnonce_parse: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_aggnonce_serialize: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_partial_sig_parse: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_partial_sig_serialize: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_pubkey_agg: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer', 'usize'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_pubkey_get: {
+    parameters: ['pointer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_pubkey_ec_tweak_add: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_pubkey_xonly_tweak_add: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_nonce_gen: {
+    parameters: [
+      'pointer',
+      'buffer',
+      'buffer',
+      'buffer',
+      'buffer',
+      'buffer',
+      'buffer',
+      'buffer',
+      'buffer',
+    ],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_nonce_gen_counter: {
+    parameters: [
+      'pointer',
+      'buffer',
+      'buffer',
+      'u64',
+      'buffer',
+      'buffer',
+      'buffer',
+      'buffer',
+    ],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_nonce_agg: {
+    parameters: ['pointer', 'buffer', 'buffer', 'usize'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_nonce_process: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_partial_sign: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_partial_sig_verify: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer', 'buffer', 'buffer'],
+    result: 'i32',
+    optional: true,
+  },
+  secp256k1_musig_partial_sig_agg: {
+    parameters: ['pointer', 'buffer', 'buffer', 'buffer', 'usize'],
+    result: 'i32',
+    optional: true,
+  },
+} as const satisfies Deno.ForeignLibraryInterface;
 
 const EXPECTED_CAPABILITY_SYMBOLS = {
   core: [
@@ -247,6 +581,7 @@ function fakeRuntime(
 }
 
 Deno.test('native ABI inventory is exact and every descriptor is optional', () => {
+  assertEquals(nativeSymbolDefinitions, EXPECTED_NATIVE_ABI6);
   assertEquals(CAPABILITY_SYMBOLS, EXPECTED_CAPABILITY_SYMBOLS);
   for (const descriptor of Object.values(nativeSymbolDefinitions)) {
     assertEquals(descriptor.optional, true);
@@ -291,6 +626,23 @@ Deno.test('capabilities classify none, all, and partial independently', () => {
       names[names.length - 1],
     ]);
   }
+});
+
+Deno.test('native statics are dereferenced before use', () => {
+  const address = {} as Deno.PointerValue;
+  const value = {} as Deno.PointerValue;
+  assert(
+    dereferenceStaticPointer(address, (received) => {
+      assert(received === address);
+      return value;
+    }) === value,
+  );
+  assertEquals(
+    dereferenceStaticPointer(null, () => {
+      throw new Error('must not dereference null');
+    }),
+    null,
+  );
 });
 
 Deno.test('auto continues after open and core failures and closes rejections', () => {
@@ -374,9 +726,38 @@ Deno.test('core incompatibility reports missing symbols and closes the handle', 
   assertEquals(handle.closeCount, 1);
 });
 
-Deno.test('config errors stay uninitialized and can be retried', () => {
+Deno.test('core rejection preserves independent optional capability states', () => {
+  const present = [
+    ...CAPABILITY_SYMBOLS.core.slice(0, -1),
+    ...CAPABILITY_SYMBOLS.extrakeys,
+    ...CAPABILITY_SYMBOLS.schnorrsig.slice(0, -1),
+    ...CAPABILITY_SYMBOLS.ellswift,
+  ];
+  const handle = fakeHandle(fakeSymbols(present));
+  const loader = createNativeLoader(fakeRuntime(
+    '/absolute/libsecp256k1.so.6',
+    () => handle,
+  ));
+
+  const error = assertThrows(() => loader.initialize(), NativeLoadError);
+  const cause = error.attempts[0].cause;
+  assert(cause instanceof NativeCoreCompatibilityError);
+  assertEquals(cause.capabilities.extrakeys.state, 'available');
+  assertEquals(cause.capabilities.schnorrsig, {
+    state: 'incompatible',
+    missingSymbols: [
+      CAPABILITY_SYMBOLS.schnorrsig[
+        CAPABILITY_SYMBOLS.schnorrsig.length - 1
+      ],
+    ],
+  });
+  assertEquals(cause.capabilities.ellswift.state, 'available');
+  assertEquals(cause.capabilities.musig.state, 'unavailable');
+  assertEquals(loader.status().capabilities, cause.capabilities);
+});
+
+Deno.test('config failure captures the environment selection once', () => {
   let reads = 0;
-  const handle = fakeHandle(fakeSymbols(ALL_SYMBOL_NAMES));
   const loader = createNativeLoader({
     target: LINUX_X64,
     readPath(): string | undefined {
@@ -384,14 +765,41 @@ Deno.test('config errors stay uninitialized and can be retried', () => {
       return reads === 1 ? undefined : '/absolute/libsecp256k1.so.6';
     },
     open(): NativeLibraryHandle {
-      return handle;
+      throw new Error('must not open after terminal configuration failure');
     },
   });
 
-  assertThrows(() => loader.initialize(), NativeConfigError);
-  assertEquals(loader.status().state, 'uninitialized');
-  assertEquals(loader.initialize().state, 'loaded');
-  assertEquals(reads, 2);
+  const first = assertThrows(() => loader.initialize(), NativeConfigError);
+  const second = assertThrows(() => loader.initialize(), NativeConfigError);
+  assert(first === second);
+  assertEquals(first.code, 'missing');
+  assertEquals(loader.status().state, 'failed');
+  assert(loader.status().error === first);
+  assertEquals(reads, 1);
+});
+
+Deno.test('environment access failure is structured and cached', () => {
+  const cause = new Error('environment denied');
+  let reads = 0;
+  const loader = createNativeLoader({
+    target: LINUX_X64,
+    readPath(): string | undefined {
+      reads++;
+      throw cause;
+    },
+    open(): NativeLibraryHandle {
+      throw new Error('must not open after environment access failure');
+    },
+  });
+
+  const first = assertThrows(() => loader.initialize(), NativeConfigError);
+  const second = assertThrows(() => loader.initialize(), NativeConfigError);
+  assert(first === second);
+  assert(first.cause === cause);
+  assertEquals(first.code, 'environment-unavailable');
+  assertEquals(loader.status().state, 'failed');
+  assert(loader.status().error === first);
+  assertEquals(reads, 1);
 });
 
 Deno.test('status has no loader side effects and exposes no handle', () => {
@@ -497,6 +905,27 @@ Deno.test('static context self-tests once before first use', () => {
     'dereference',
     'callback:2',
   ]);
+});
+
+Deno.test('static context rejects a null dereferenced pointer', () => {
+  let callbackCalled = false;
+  const symbols = coreSymbols({
+    secp256k1_context_static: {} as Deno.PointerValue,
+  }) as import('../src/native/symbols.ts').LoadedCoreSymbols;
+  const helpers = createNativeContextHelpers(
+    symbols,
+    contextRuntime([], null),
+  );
+
+  const error = assertThrows(
+    () =>
+      helpers.withStaticContext(() => {
+        callbackCalled = true;
+      }),
+    NativeContextError,
+  );
+  assertEquals(error.code, 'static-context-unavailable');
+  assertEquals(callbackCalled, false);
 });
 
 Deno.test('signing context uses NONE, randomizes, calls back, and destroys', () => {
@@ -614,30 +1043,188 @@ Deno.test('signing context destroys after randomize failure', () => {
   assertEquals(events, ['random:32', 'randomize', 'destroy']);
 });
 
+Deno.test('signing context rejects a null created pointer', () => {
+  const events: string[] = [];
+  const symbols = coreSymbols({
+    secp256k1_context_create: () => null,
+    secp256k1_context_randomize: () => {
+      events.push('randomize');
+      return 1;
+    },
+    secp256k1_context_destroy: () => events.push('destroy'),
+  }) as import('../src/native/symbols.ts').LoadedCoreSymbols;
+  const helpers = createNativeContextHelpers(
+    symbols,
+    contextRuntime(events, null),
+  );
+
+  const error = assertThrows(
+    () => helpers.withSigningContext(() => events.push('callback')),
+    NativeContextError,
+  );
+  assertEquals(error.code, 'context-create-failed');
+  assertEquals(events, []);
+});
+
 Deno.test('real native initialization and contexts run only in a subprocess', async () => {
-  const path = Deno.env.get('DENO_SECP256K1_PATH');
+  const localMacLibrary = decodeURIComponent(
+    new URL(
+      '../secp256k1/build-deno/lib/libsecp256k1.6.dylib',
+      import.meta.url,
+    ).pathname,
+  );
+  const path = Deno.build.os === 'darwin'
+    ? localMacLibrary
+    : Deno.env.get('DENO_SECP256K1_PATH');
   assert(path, 'DENO_SECP256K1_PATH must select the integration library');
   const moduleUrl = new URL('../src/native/mod.ts', import.meta.url).href;
   const contextUrl = new URL('../src/native/context.ts', import.meta.url).href;
+  const loaderUrl = new URL('../src/native/loader.ts', import.meta.url).href;
+  const symbolsUrl = new URL('../src/native/symbols.ts', import.meta.url).href;
   const script = `
     import { initializeNative, nativeStatus } from ${JSON.stringify(moduleUrl)};
     import { withSigningContext, withStaticContext } from ${
     JSON.stringify(contextUrl)
   };
+    import { getNativeSymbols, requireCapability } from ${
+    JSON.stringify(loaderUrl)
+  };
+    import { dereferenceStaticPointer } from ${JSON.stringify(symbolsUrl)};
     if (nativeStatus().state !== 'uninitialized') throw new Error('eager load');
     const status = initializeNative({
       require: ['extrakeys', 'schnorrsig', 'ellswift', 'musig'],
     });
+    const core = getNativeSymbols();
+    const extrakeys = requireCapability('extrakeys');
+    const schnorrsig = requireCapability('schnorrsig');
+    const ellswift = requireCapability('ellswift');
+    const musig = requireCapability('musig');
+    const requireOk = (result: number, operation: string): void => {
+      if (result !== 1) throw new Error(operation + ' failed');
+    };
+    const scalar = (value: number): Uint8Array => {
+      const output = new Uint8Array(32);
+      output[31] = value;
+      return output;
+    };
+    const seckeyA = scalar(7);
+    const seckeyB = scalar(8);
+    const message = new Uint8Array(32).fill(9);
+    const pubkeyA = new Uint8Array(64);
+    const keypairA = new Uint8Array(96);
+    const xonlyA = new Uint8Array(64);
+    const signature = new Uint8Array(64);
+    const ellA = new Uint8Array(64);
+    const ellB = new Uint8Array(64);
+    const bip324Hash = dereferenceStaticPointer(
+      ellswift.secp256k1_ellswift_xdh_hash_function_bip324,
+    );
+    if (bip324Hash === null) throw new Error('null BIP324 hash callback');
     withStaticContext((context) => {
-      if (context === null) throw new Error('null static context');
+      const tagged = new Uint8Array(32);
+      const tag = new TextEncoder().encode('NativeTable');
+      requireOk(core.secp256k1_tagged_sha256(
+        context,
+        tagged,
+        tag,
+        BigInt(tag.length),
+        message,
+        BigInt(message.length),
+      ), 'tagged sha256');
     });
     withSigningContext((context) => {
-      if (context === null) throw new Error('null signing context');
+      requireOk(
+        core.secp256k1_ec_seckey_verify(context, seckeyA),
+        'seckey verify',
+      );
+      requireOk(
+        core.secp256k1_ec_pubkey_create(context, pubkeyA, seckeyA),
+        'pubkey create',
+      );
+      requireOk(
+        extrakeys.secp256k1_keypair_create(context, keypairA, seckeyA),
+        'keypair create',
+      );
+      requireOk(
+        extrakeys.secp256k1_keypair_xonly_pub(
+          context,
+          xonlyA,
+          null,
+          keypairA,
+        ),
+        'xonly pubkey',
+      );
+      requireOk(
+        schnorrsig.secp256k1_schnorrsig_sign32(
+          context,
+          signature,
+          message,
+          keypairA,
+          null,
+        ),
+        'schnorr sign32',
+      );
+      requireOk(
+        ellswift.secp256k1_ellswift_create(
+          context,
+          ellA,
+          seckeyA,
+          new Uint8Array(32).fill(10),
+        ),
+        'ellswift create A',
+      );
+      requireOk(
+        ellswift.secp256k1_ellswift_create(
+          context,
+          ellB,
+          seckeyB,
+          new Uint8Array(32).fill(11),
+        ),
+        'ellswift create B',
+      );
+      requireOk(
+        ellswift.secp256k1_ellswift_xdh(
+          context,
+          new Uint8Array(32),
+          ellA,
+          ellB,
+          seckeyA,
+          0,
+          bip324Hash,
+          null,
+        ),
+        'ellswift BIP324 xdh',
+      );
+    });
+    withStaticContext((context) => {
+      requireOk(
+        schnorrsig.secp256k1_schnorrsig_verify(
+          context,
+          signature,
+          message,
+          BigInt(message.length),
+          xonlyA,
+        ),
+        'schnorr verify',
+      );
+      const pubkeyPointers = new BigUint64Array([
+        Deno.UnsafePointer.value(Deno.UnsafePointer.of(pubkeyA)),
+      ]);
+      requireOk(
+        musig.secp256k1_musig_pubkey_agg(
+          context,
+          new Uint8Array(64),
+          new Uint8Array(197),
+          new Uint8Array(pubkeyPointers.buffer),
+          1n,
+        ),
+        'musig pubkey aggregate',
+      );
     });
     console.log(JSON.stringify(status));
   `;
   const output = await new Deno.Command(Deno.execPath(), {
-    args: ['eval', script],
+    args: ['eval', '--check', script],
     env: { DENO_SECP256K1_PATH: path },
     stdout: 'piped',
     stderr: 'piped',

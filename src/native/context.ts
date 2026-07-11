@@ -2,12 +2,18 @@
 
 import { NativeContextError } from './errors.ts';
 import { getNativeSymbols } from './loader.ts';
-import type { LoadedCoreSymbols } from './symbols.ts';
+import { dereferenceStaticPointer, type LoadedCoreSymbols } from './symbols.ts';
 
 /** Required flag for mutable contexts in the supported libsecp256k1 ABI. */
 export const SECP256K1_CONTEXT_NONE = 1;
 
 type NativeContext = NonNullable<Deno.PointerValue>;
+type NativeContextOperation = (context: NativeContext) => unknown;
+type ForbiddenContextResult = NativeContext | PromiseLike<unknown>;
+type SafeContextOperation<Operation extends NativeContextOperation> =
+  Extract<ReturnType<Operation>, ForbiddenContextResult> extends never
+    ? Operation
+    : never;
 
 /** Injectable unsafe operations and randomness used by context helpers. */
 export interface NativeContextRuntime {
@@ -18,14 +24,17 @@ export interface NativeContextRuntime {
 }
 
 interface NativeContextHelpers {
-  withStaticContext<T>(operation: (context: NativeContext) => T): T;
-  withSigningContext<T>(operation: (context: NativeContext) => T): T;
+  withStaticContext<Operation extends NativeContextOperation>(
+    operation: SafeContextOperation<Operation>,
+  ): ReturnType<Operation>;
+  withSigningContext<Operation extends NativeContextOperation>(
+    operation: SafeContextOperation<Operation>,
+  ): ReturnType<Operation>;
 }
 
 const defaultContextRuntime: NativeContextRuntime = {
   dereferenceStatic(address: Deno.PointerValue): Deno.PointerValue {
-    if (address === null) return null;
-    return new Deno.UnsafePointerView(address).getPointer(0);
+    return dereferenceStaticPointer(address);
   },
   randomFill(seed: Uint8Array): void {
     crypto.getRandomValues(seed);
@@ -39,9 +48,9 @@ export function createNativeContextHelpers(
 ): NativeContextHelpers {
   let staticContextSelfTested = false;
 
-  function withStaticContext<T>(
-    operation: (context: NativeContext) => T,
-  ): T {
+  function withStaticContext<Operation extends NativeContextOperation>(
+    operation: SafeContextOperation<Operation>,
+  ): ReturnType<Operation> {
     if (!staticContextSelfTested) {
       symbols.secp256k1_selftest();
       staticContextSelfTested = true;
@@ -52,12 +61,12 @@ export function createNativeContextHelpers(
     if (context === null) {
       throw new NativeContextError('static-context-unavailable');
     }
-    return operation(context);
+    return operation(context) as ReturnType<Operation>;
   }
 
-  function withSigningContext<T>(
-    operation: (context: NativeContext) => T,
-  ): T {
+  function withSigningContext<Operation extends NativeContextOperation>(
+    operation: SafeContextOperation<Operation>,
+  ): ReturnType<Operation> {
     const context = symbols.secp256k1_context_create(
       SECP256K1_CONTEXT_NONE,
     );
@@ -71,7 +80,7 @@ export function createNativeContextHelpers(
       if (!symbols.secp256k1_context_randomize(context, seed)) {
         throw new NativeContextError('context-randomize-failed');
       }
-      return operation(context);
+      return operation(context) as ReturnType<Operation>;
     } finally {
       symbols.secp256k1_context_destroy(context);
     }
@@ -91,7 +100,7 @@ function contextHelpers(): NativeContextHelpers {
  * Runs a synchronous internal operation with the self-tested static context.
  */
 export function withStaticContext<T>(
-  operation: (context: NativeContext) => T,
+  operation: SafeContextOperation<(context: NativeContext) => T>,
 ): T {
   return contextHelpers().withStaticContext(operation);
 }
@@ -101,7 +110,7 @@ export function withStaticContext<T>(
  * context. The callback must finish before this function returns.
  */
 export function withSigningContext<T>(
-  operation: (context: NativeContext) => T,
+  operation: SafeContextOperation<(context: NativeContext) => T>,
 ): T {
   return contextHelpers().withSigningContext(operation);
 }

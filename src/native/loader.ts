@@ -5,6 +5,7 @@ import {
   NativeCapabilityError,
   NativeConfigError,
   NativeCoreCompatibilityError,
+  type NativeInitializationError,
   type NativeLoadAttempt,
   NativeLoadError,
 } from './errors.ts';
@@ -51,8 +52,8 @@ export interface NativeStatus {
   readonly selectedCandidate: string | null;
   /** Independent symbol-derived capability states. */
   readonly capabilities: NativeCapabilityStatuses;
-  /** Cached terminal load error, if candidate loading failed. */
-  readonly error: NativeLoadError | null;
+  /** Cached terminal configuration or loading error. */
+  readonly error: NativeInitializationError | null;
 }
 
 /** State and operations of an isolated native-loader instance. */
@@ -79,7 +80,7 @@ type LoaderState =
   }
   | {
     readonly kind: 'failed';
-    readonly error: NativeLoadError;
+    readonly error: NativeInitializationError;
     readonly capabilities: NativeCapabilityStatuses;
   };
 
@@ -136,15 +137,32 @@ export function createNativeLoader(runtime: NativeLoaderRuntime): NativeLoader {
       try {
         value = runtime.readPath();
       } catch (cause) {
-        throw new NativeConfigError(
+        const error = new NativeConfigError(
           'environment-unavailable',
           undefined,
           runtime.target,
           { cause },
         );
+        state = {
+          kind: 'failed',
+          error,
+          capabilities: unavailableCapabilities(),
+        };
+        throw error;
       }
 
-      const candidates = nativeLibraryCandidates(value, runtime.target);
+      let candidates: readonly string[];
+      try {
+        candidates = nativeLibraryCandidates(value, runtime.target);
+      } catch (cause) {
+        if (!(cause instanceof NativeConfigError)) throw cause;
+        state = {
+          kind: 'failed',
+          error: cause,
+          capabilities: unavailableCapabilities(),
+        };
+        throw cause;
+      }
       const attempts: NativeLoadAttempt[] = [];
       let failedCapabilities = unavailableCapabilities();
 
@@ -162,14 +180,10 @@ export function createNativeLoader(runtime: NativeLoaderRuntime): NativeLoader {
         if (core.state !== 'available') {
           const cause = new NativeCoreCompatibilityError(
             candidate,
-            core.state,
-            core.missingSymbols,
+            capabilities,
           );
           attempts.push({ candidate, cause });
-          failedCapabilities = {
-            ...unavailableCapabilities(),
-            core,
-          };
+          failedCapabilities = capabilities;
           handle.close();
           continue;
         }
@@ -238,7 +252,7 @@ function statusSnapshot(
   state: NativeStatus['state'],
   selectedCandidate: string | null,
   capabilities: NativeCapabilityStatuses,
-  error: NativeLoadError | null,
+  error: NativeInitializationError | null,
 ): NativeStatus {
   const capabilityEntries = (
     Object.keys(capabilities) as NativeCapability[]

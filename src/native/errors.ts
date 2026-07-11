@@ -1,6 +1,10 @@
 /** Typed errors produced by native libsecp256k1 configuration and loading. */
 
-import type { NativeCapability, NativeCapabilityState } from './symbols.ts';
+import type {
+  NativeCapability,
+  NativeCapabilityState,
+  NativeCapabilityStatuses,
+} from './symbols.ts';
 
 /** Machine-readable reasons why native-library configuration is invalid. */
 export type NativeConfigErrorCode =
@@ -63,17 +67,20 @@ export class NativeCoreCompatibilityError extends Error {
   /** Required core symbols not exported by the candidate. */
   readonly missingSymbols: readonly string[];
 
+  /** Complete independent capability classification for the candidate. */
+  readonly capabilities: NativeCapabilityStatuses;
+
   /** Creates a structured core compatibility failure. */
   constructor(
     candidate: string,
-    state: NativeCapabilityState,
-    missingSymbols: readonly string[],
+    capabilities: NativeCapabilityStatuses,
   ) {
     super('Native libsecp256k1 core symbols are incomplete');
     this.name = 'NativeCoreCompatibilityError';
     this.candidate = candidate;
-    this.state = state;
-    this.missingSymbols = [...missingSymbols];
+    this.state = capabilities.core.state;
+    this.missingSymbols = [...capabilities.core.missingSymbols];
+    this.capabilities = copyCapabilities(capabilities);
   }
 }
 
@@ -92,6 +99,9 @@ export class NativeLoadError extends Error {
     this.attempts = attempts.map((attempt) => ({ ...attempt }));
   }
 }
+
+/** Terminal errors cached by native-library initialization. */
+export type NativeInitializationError = NativeConfigError | NativeLoadError;
 
 /** Reports a requested optional capability that is not usable. */
 export class NativeCapabilityError extends Error {
@@ -161,4 +171,20 @@ function contextErrorMessage(code: NativeContextErrorCode): string {
     case 'context-randomize-failed':
       return 'Native signing context randomization failed';
   }
+}
+
+function copyCapabilities(
+  capabilities: NativeCapabilityStatuses,
+): NativeCapabilityStatuses {
+  const copy = (capability: NativeCapability) => ({
+    state: capabilities[capability].state,
+    missingSymbols: [...capabilities[capability].missingSymbols],
+  });
+  return {
+    core: copy('core'),
+    extrakeys: copy('extrakeys'),
+    schnorrsig: copy('schnorrsig'),
+    ellswift: copy('ellswift'),
+    musig: copy('musig'),
+  };
 }

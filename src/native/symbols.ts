@@ -380,6 +380,14 @@ export type NativeSymbols = Deno.DynamicLibrary<
   typeof nativeSymbolDefinitions
 >['symbols'];
 
+/** Names an independently detected native feature group. */
+export type NativeCapability =
+  | 'core'
+  | 'extrakeys'
+  | 'schnorrsig'
+  | 'ellswift'
+  | 'musig';
+
 /** Exact symbols used to establish each independent native capability. */
 export const CAPABILITY_SYMBOLS = {
   core: [
@@ -447,10 +455,10 @@ export const CAPABILITY_SYMBOLS = {
     'secp256k1_musig_partial_sig_verify',
     'secp256k1_musig_partial_sig_agg',
   ],
-} as const satisfies Record<string, readonly (keyof NativeSymbols)[]>;
-
-/** Names an independently detected native feature group. */
-export type NativeCapability = keyof typeof CAPABILITY_SYMBOLS;
+} as const satisfies Record<
+  NativeCapability,
+  readonly (keyof NativeSymbols)[]
+>;
 
 /** Availability classification for a native feature group. */
 export type NativeCapabilityState =
@@ -487,3 +495,21 @@ export type LoadedCoreSymbols = NativeSymbolsWith<'core'>;
 /** Raw symbols after successful core and requested-capability validation. */
 export type LoadedCapabilitySymbols<C extends NativeCapability> =
   NativeSymbolsWith<'core' | C>;
+
+/** Internal reader for a non-null exported static-symbol address. */
+export type NativeStaticPointerReader = (
+  address: NonNullable<Deno.PointerValue>,
+) => Deno.PointerValue;
+
+/**
+ * Dereferences an exported pointer static such as the static context or the
+ * BIP324 EllSwift hash callback. `ForeignStatic` exposes the variable address,
+ * not the pointer value stored in that variable.
+ */
+export function dereferenceStaticPointer(
+  address: Deno.PointerValue,
+  read: NativeStaticPointerReader = (pointer) =>
+    new Deno.UnsafePointerView(pointer).getPointer(0),
+): Deno.PointerValue {
+  return address === null ? null : read(address);
+}

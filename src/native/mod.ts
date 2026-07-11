@@ -1,11 +1,11 @@
-/** Public loader surface and internal typed access for native-backed modules. */
+/**
+ * Capability-aware loading and diagnostics for a user-installed
+ * libsecp256k1.
+ *
+ * @module
+ */
 
-export {
-  getNativeSymbols,
-  initializeNative,
-  nativeStatus,
-  requireCapability,
-} from './loader.ts';
+export { initializeNative, nativeStatus } from './loader.ts';
 export type { NativeInitializationOptions, NativeStatus } from './loader.ts';
 export {
   NativeCapabilityError,
@@ -17,11 +17,11 @@ export {
 export type {
   NativeConfigErrorCode,
   NativeContextErrorCode,
+  NativeErrorTarget,
+  NativeInitializationError,
   NativeLoadAttempt,
 } from './errors.ts';
 export type {
-  LoadedCapabilitySymbols,
-  LoadedCoreSymbols,
   NativeCapability,
   NativeCapabilityState,
   NativeCapabilityStatus,
