@@ -1,4 +1,10 @@
-import { assert, assertEquals, assertNotEquals, assertThrows } from './deps.ts';
+import {
+  assert,
+  assertEquals,
+  assertNotEquals,
+  assertThrows,
+  ffiTest,
+} from './deps.ts';
 import {
   CompressedPublicKey,
   Digest32,
@@ -59,7 +65,7 @@ Deno.test('Digest32 copies input and output and rejects other lengths', () => {
   );
 });
 
-Deno.test('PublicKey accepts compressed, uncompressed, and hybrid SEC', () => {
+ffiTest('PublicKey accepts compressed, uncompressed, and hybrid SEC', () => {
   const compressed = PublicKey.parse(GENERATOR_COMPRESSED);
   assertEquals(compressed.sourceEncoding, 'compressed');
   assertEquals(compressed.toCompressedBytes(), GENERATOR_COMPRESSED);
@@ -81,7 +87,7 @@ Deno.test('PublicKey accepts compressed, uncompressed, and hybrid SEC', () => {
   assertEquals(PublicKey.tryParse(new Uint8Array(32)), null);
 });
 
-Deno.test('PublicKey and CompressedPublicKey isolate mutable buffers', () => {
+ffiTest('PublicKey and CompressedPublicKey isolate mutable buffers', () => {
   const input = GENERATOR_COMPRESSED.slice();
   const key = PublicKey.parse(input);
   input.fill(0);
@@ -103,59 +109,65 @@ Deno.test('PublicKey and CompressedPublicKey isolate mutable buffers', () => {
   assertEquals(CompressedPublicKey.tryParse(GENERATOR_UNCOMPRESSED), null);
 });
 
-Deno.test('PublicKey toXOnly reports Y parity and validates x-only keys', () => {
-  const even = PublicKey.parse(GENERATOR_COMPRESSED).toXOnly();
-  assertEquals(even.parity, 0);
-  assertEquals(even.key.toBytes(), GENERATOR_COMPRESSED.slice(1));
+ffiTest(
+  'PublicKey toXOnly reports Y parity and validates x-only keys',
+  () => {
+    const even = PublicKey.parse(GENERATOR_COMPRESSED).toXOnly();
+    assertEquals(even.parity, 0);
+    assertEquals(even.key.toBytes(), GENERATOR_COMPRESSED.slice(1));
 
-  const oddEncoding = GENERATOR_COMPRESSED.slice();
-  oddEncoding[0] = 0x03;
-  const odd = PublicKey.parse(oddEncoding).toXOnly();
-  assertEquals(odd.parity, 1);
-  assertEquals(odd.key.toBytes(), even.key.toBytes());
+    const oddEncoding = GENERATOR_COMPRESSED.slice();
+    oddEncoding[0] = 0x03;
+    const odd = PublicKey.parse(oddEncoding).toXOnly();
+    assertEquals(odd.parity, 1);
+    assertEquals(odd.key.toBytes(), even.key.toBytes());
 
-  const input = even.key.toBytes();
-  const xOnly = XOnlyPublicKey.parse(input);
-  input.fill(0);
-  assertEquals(xOnly.toBytes(), GENERATOR_COMPRESSED.slice(1));
-  const output = xOnly.toBytes();
-  output.fill(0);
-  assertEquals(xOnly.toBytes(), GENERATOR_COMPRESSED.slice(1));
+    const input = even.key.toBytes();
+    const xOnly = XOnlyPublicKey.parse(input);
+    input.fill(0);
+    assertEquals(xOnly.toBytes(), GENERATOR_COMPRESSED.slice(1));
+    const output = xOnly.toBytes();
+    output.fill(0);
+    assertEquals(xOnly.toBytes(), GENERATOR_COMPRESSED.slice(1));
 
-  assertEquals(XOnlyPublicKey.tryParse(new Uint8Array(31)), null);
-  assertEquals(
-    XOnlyPublicKey.tryParse(
-      hex('fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f'),
-    ),
-    null,
-  );
-});
+    assertEquals(XOnlyPublicKey.tryParse(new Uint8Array(31)), null);
+    assertEquals(
+      XOnlyPublicKey.tryParse(
+        hex('fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f'),
+      ),
+      null,
+    );
+  },
+);
 
-Deno.test('ECDSA candidates separate syntax, length, and scalar validity', () => {
-  const der = EcdsaDerSignature.fromBytes(ECDSA_DER);
-  assertEquals(der.toBytes(), ECDSA_DER);
-  assertEquals(der.decode()?.toCompact(), ECDSA_COMPACT);
+ffiTest(
+  'ECDSA candidates separate syntax, length, and scalar validity',
+  () => {
+    const der = EcdsaDerSignature.fromBytes(ECDSA_DER);
+    assertEquals(der.toBytes(), ECDSA_DER);
+    assertEquals(der.decode()?.toCompact(), ECDSA_COMPACT);
 
-  const compact = EcdsaCompactSignature.fromBytes(ECDSA_COMPACT);
-  assertEquals(compact.decode()?.toDer(), ECDSA_DER);
-  assertEquals(EcdsaCompactSignature.tryFromBytes(new Uint8Array(63)), null);
+    const compact = EcdsaCompactSignature.fromBytes(ECDSA_COMPACT);
+    assertEquals(compact.decode()?.toDer(), ECDSA_DER);
+    assertEquals(EcdsaCompactSignature.tryFromBytes(new Uint8Array(63)), null);
 
-  const zeroDer = EcdsaDerSignature.fromBytes(hex('3006020100020101'));
-  assertEquals(zeroDer.decode(), null);
-  const orderDer = strictDer(GROUP_ORDER, hex('01'));
-  assert(EcdsaDerSignature.tryFromBytes(orderDer) !== null);
-  assertEquals(EcdsaDerSignature.fromBytes(orderDer).decode(), null);
+    const zeroDer = EcdsaDerSignature.fromBytes(hex('3006020100020101'));
+    assertEquals(zeroDer.decode(), null);
+    const orderDer = strictDer(GROUP_ORDER, hex('01'));
+    assert(EcdsaDerSignature.tryFromBytes(orderDer) !== null);
+    assertEquals(EcdsaDerSignature.fromBytes(orderDer).decode(), null);
 
-  const zeroCompact = new Uint8Array(64);
-  zeroCompact[63] = 1;
-  assertEquals(EcdsaCompactSignature.fromBytes(zeroCompact).decode(), null);
-  assertEquals(
-    EcdsaCompactSignature.fromBytes(
-      Uint8Array.from([...GROUP_ORDER, ...new Uint8Array(31), 1]),
-    ).decode(),
-    null,
-  );
-});
+    const zeroCompact = new Uint8Array(64);
+    zeroCompact[63] = 1;
+    assertEquals(EcdsaCompactSignature.fromBytes(zeroCompact).decode(), null);
+    assertEquals(
+      EcdsaCompactSignature.fromBytes(
+        Uint8Array.from([...GROUP_ORDER, ...new Uint8Array(31), 1]),
+      ).decode(),
+      null,
+    );
+  },
+);
 
 Deno.test('strict DER candidate rejects malformed encodings', () => {
   assertEquals(EcdsaDerSignature.tryFromBytes(hex('3005020101020101')), null);
@@ -177,7 +189,7 @@ Deno.test('strict DER candidate rejects malformed encodings', () => {
   );
 });
 
-Deno.test('ECDSA values are immutable and normalize high-S', () => {
+ffiTest('ECDSA values are immutable and normalize high-S', () => {
   const low = EcdsaCompactSignature.fromBytes(ECDSA_COMPACT).decode();
   const high = EcdsaCompactSignature.fromBytes(ECDSA_HIGH_S).decode();
   assert(low !== null && high !== null);
@@ -191,56 +203,65 @@ Deno.test('ECDSA values are immutable and normalize high-S', () => {
   assertEquals(low.toCompact(), ECDSA_COMPACT);
 });
 
-Deno.test('known ECDSA vector verifies in compact and strict DER forms', () => {
-  const digest = Digest32.fromBytes(ECDSA_DIGEST);
-  const publicKey = PublicKey.parse(ECDSA_PUBLIC_KEY);
-  const low = EcdsaCompactSignature.fromBytes(ECDSA_COMPACT).decode();
-  const high = EcdsaCompactSignature.fromBytes(ECDSA_HIGH_S).decode();
-  assert(low !== null && high !== null);
+ffiTest(
+  'known ECDSA vector verifies in compact and strict DER forms',
+  () => {
+    const digest = Digest32.fromBytes(ECDSA_DIGEST);
+    const publicKey = PublicKey.parse(ECDSA_PUBLIC_KEY);
+    const low = EcdsaCompactSignature.fromBytes(ECDSA_COMPACT).decode();
+    const high = EcdsaCompactSignature.fromBytes(ECDSA_HIGH_S).decode();
+    assert(low !== null && high !== null);
 
-  assert(verifyEcdsa(low, digest, publicKey));
-  assert(verifyEcdsa(high, digest, publicKey));
-  assert(
-    verifyEcdsaDer(EcdsaDerSignature.fromBytes(ECDSA_DER), digest, publicKey),
-  );
+    assert(verifyEcdsa(low, digest, publicKey));
+    assert(verifyEcdsa(high, digest, publicKey));
+    assert(
+      verifyEcdsaDer(EcdsaDerSignature.fromBytes(ECDSA_DER), digest, publicKey),
+    );
 
-  const changed = ECDSA_DIGEST.slice();
-  changed[0] ^= 1;
-  assertEquals(verifyEcdsa(low, Digest32.fromBytes(changed), publicKey), false);
-  const invalid = EcdsaDerSignature.fromBytes(hex('3006020100020101'));
-  assertEquals(verifyEcdsaDer(invalid, digest, publicKey), false);
-});
+    const changed = ECDSA_DIGEST.slice();
+    changed[0] ^= 1;
+    assertEquals(
+      verifyEcdsa(low, Digest32.fromBytes(changed), publicKey),
+      false,
+    );
+    const invalid = EcdsaDerSignature.fromBytes(hex('3006020100020101'));
+    assertEquals(verifyEcdsaDer(invalid, digest, publicKey), false);
+  },
+);
 
-Deno.test('known BIP340 vector verifies and candidates check length only', () => {
-  const publicKeyBytes = hex(
-    'd69c3509bb99e412e68b0fe8544e72837dfa30746d8be2aa65975f29d22dc7b9',
-  );
-  const digestBytes = hex(
-    '4df3c3f68fcc83b27e9d42c90431a72499f17875c81a599b566c9889b9696703',
-  );
-  const signatureBytes = hex(
-    '00000000000000000000003b78ce563f89a0ed9414f5aa28ad0d96d6795f9c63' +
-      '76afb1548af603b3eb45c9f8207dee1060cb71c04e80f593060b07d28308d7f4',
-  );
-  assertEquals(signatureBytes.length, 64);
+ffiTest(
+  'known BIP340 vector verifies and candidates check length only',
+  () => {
+    const publicKeyBytes = hex(
+      'd69c3509bb99e412e68b0fe8544e72837dfa30746d8be2aa65975f29d22dc7b9',
+    );
+    const digestBytes = hex(
+      '4df3c3f68fcc83b27e9d42c90431a72499f17875c81a599b566c9889b9696703',
+    );
+    const signatureBytes = hex(
+      '00000000000000000000003b78ce563f89a0ed9414f5aa28ad0d96d6795f9c63' +
+        '76afb1548af603b3eb45c9f8207dee1060cb71c04e80f593060b07d28308d7f4',
+    );
+    assertEquals(signatureBytes.length, 64);
 
-  const signature = SchnorrSignature.fromBytes(signatureBytes);
-  const publicKey = XOnlyPublicKey.parse(publicKeyBytes);
-  const digest = Digest32.fromBytes(digestBytes);
-  assert(verifyTaprootSignature(signature, digest, publicKey));
+    const signature = SchnorrSignature.fromBytes(signatureBytes);
+    const publicKey = XOnlyPublicKey.parse(publicKeyBytes);
+    const digest = Digest32.fromBytes(digestBytes);
+    assert(verifyTaprootSignature(signature, digest, publicKey));
 
-  const allZero = SchnorrSignature.fromBytes(new Uint8Array(64));
-  assertEquals(verifyTaprootSignature(allZero, digest, publicKey), false);
-  assertEquals(SchnorrSignature.tryFromBytes(new Uint8Array(63)), null);
+    const allZero = SchnorrSignature.fromBytes(new Uint8Array(64));
+    assertEquals(verifyTaprootSignature(allZero, digest, publicKey), false);
+    assertEquals(SchnorrSignature.tryFromBytes(new Uint8Array(63)), null);
 
-  const input = signatureBytes.slice();
-  const isolated = SchnorrSignature.fromBytes(input);
-  input.fill(0);
-  assertNotEquals(isolated.toBytes(), input);
-  const output = isolated.toBytes();
-  output.fill(0);
-  assertEquals(isolated.toBytes(), signatureBytes);
-});
+    const input = signatureBytes.slice();
+    const isolated = SchnorrSignature.fromBytes(input);
+    input.fill(0);
+    assertNotEquals(isolated.toBytes(), input);
+    const output = isolated.toBytes();
+    output.fill(0);
+    assertEquals(isolated.toBytes(), signatureBytes);
+  },
+);
 
 function hex(value: string): Uint8Array {
   const result = new Uint8Array(value.length / 2);

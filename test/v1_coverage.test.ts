@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertThrows, N } from './deps.ts';
+import { assert, assertEquals, assertThrows, ffiTest, N } from './deps.ts';
 import {
   CompressedPublicKey,
   PublicKey,
@@ -46,72 +46,78 @@ const TWO_G = hex(
   '02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5',
 );
 
-Deno.test('v1 key and signature parsers cover every public rejection shape', () => {
-  assertThrows(() => PublicKey.parse(new Uint8Array()), Secp256k1InputError);
-  assertThrows(
-    () => CompressedPublicKey.parse(new Uint8Array(33)),
-    Secp256k1InputError,
-  );
-  assertEquals(XOnlyPublicKey.tryParse(new Uint8Array(31)), null);
-  assertEquals(XOnlyPublicKey.tryParse(new Uint8Array(32).fill(0xff)), null);
-  assertThrows(
-    () => XOnlyPublicKey.parse(new Uint8Array(31)),
-    Secp256k1InputError,
-  );
+ffiTest(
+  'v1 key and signature parsers cover every public rejection shape',
+  () => {
+    assertThrows(() => PublicKey.parse(new Uint8Array()), Secp256k1InputError);
+    assertThrows(
+      () => CompressedPublicKey.parse(new Uint8Array(33)),
+      Secp256k1InputError,
+    );
+    assertEquals(XOnlyPublicKey.tryParse(new Uint8Array(31)), null);
+    assertEquals(XOnlyPublicKey.tryParse(new Uint8Array(32).fill(0xff)), null);
+    assertThrows(
+      () => XOnlyPublicKey.parse(new Uint8Array(31)),
+      Secp256k1InputError,
+    );
 
-  const compressed = CompressedPublicKey.parse(G);
-  assertEquals(compressed.toPublicKey().toCompressedBytes(), G);
-  assertEquals(compressed.toPublicKey().toXOnly().key.toBytes(), G.slice(1));
+    const compressed = CompressedPublicKey.parse(G);
+    assertEquals(compressed.toPublicKey().toCompressedBytes(), G);
+    assertEquals(compressed.toPublicKey().toXOnly().key.toBytes(), G.slice(1));
 
-  const compactBytes = new Uint8Array(64);
-  compactBytes[31] = 1;
-  compactBytes[63] = 1;
-  const compact = EcdsaCompactSignature.fromBytes(compactBytes);
-  assertEquals(compact.toBytes(), compactBytes);
-  assertThrows(
-    () => EcdsaCompactSignature.fromBytes(new Uint8Array(63)),
-    Secp256k1InputError,
-  );
-  assertThrows(
-    () => SchnorrSignature.fromBytes(new Uint8Array(63)),
-    Secp256k1InputError,
-  );
+    const compactBytes = new Uint8Array(64);
+    compactBytes[31] = 1;
+    compactBytes[63] = 1;
+    const compact = EcdsaCompactSignature.fromBytes(compactBytes);
+    assertEquals(compact.toBytes(), compactBytes);
+    assertThrows(
+      () => EcdsaCompactSignature.fromBytes(new Uint8Array(63)),
+      Secp256k1InputError,
+    );
+    assertThrows(
+      () => SchnorrSignature.fromBytes(new Uint8Array(63)),
+      Secp256k1InputError,
+    );
 
-  for (
-    const malformed of [
-      '3006030101020101',
-      '3006020002020101',
-      '3006020301020101',
-      '3006020101030101',
-      '3006020101020000',
-      '3006020101020180',
-      '300702010102020001',
-    ]
-  ) {
-    assertEquals(EcdsaDerSignature.tryFromBytes(hex(malformed)), null);
-  }
-});
+    for (
+      const malformed of [
+        '3006030101020101',
+        '3006020002020101',
+        '3006020301020101',
+        '3006020101030101',
+        '3006020101020000',
+        '3006020101020180',
+        '300702010102020001',
+      ]
+    ) {
+      assertEquals(EcdsaDerSignature.tryFromBytes(hex(malformed)), null);
+    }
+  },
+);
 
-Deno.test('v1 secret handles reject invalid scalars and all destroyed uses', () => {
-  for (const invalid of [new Uint8Array(31), new Uint8Array(32), N()]) {
-    assertThrows(() => SecretKey.fromBytes(invalid), Secp256k1InputError);
-  }
+ffiTest(
+  'v1 secret handles reject invalid scalars and all destroyed uses',
+  () => {
+    for (const invalid of [new Uint8Array(31), new Uint8Array(32), N()]) {
+      assertThrows(() => SecretKey.fromBytes(invalid), Secp256k1InputError);
+    }
 
-  const key = SecretKey.fromBytes(scalar(1));
-  key[Symbol.dispose]();
-  const digest = Digest32.fromBytes(new Uint8Array(32));
-  for (
-    const operation of [
-      () => key.xOnlyPublicKey(),
-      () => signEcdsa(digest, key),
-      () => signTaprootSignature(digest, key),
-    ]
-  ) {
-    assertThrows(operation, SecretKeyDestroyedError);
-  }
-});
+    const key = SecretKey.fromBytes(scalar(1));
+    key[Symbol.dispose]();
+    const digest = Digest32.fromBytes(new Uint8Array(32));
+    for (
+      const operation of [
+        () => key.xOnlyPublicKey(),
+        () => signEcdsa(digest, key),
+        () => signTaprootSignature(digest, key),
+      ]
+    ) {
+      assertThrows(operation, SecretKeyDestroyedError);
+    }
+  },
+);
 
-Deno.test('Taproot value errors and mismatch paths are explicit', () => {
+ffiTest('Taproot value errors and mismatch paths are explicit', () => {
   assertThrows(
     () => TapMerkleRoot.fromBytes(new Uint8Array(31)),
     Secp256k1InputError,
@@ -182,117 +188,123 @@ Deno.test('BIP324 native errors expose every stable operation code', () => {
   }
 });
 
-Deno.test('MuSig2 validates public state, participant indexes, and signing keys', () => {
-  assertThrows(
-    () => MuSigKeyAggregation.fromOrderedPublicKeys([]),
-    MuSigStateError,
-  );
-  const aggregation = MuSigKeyAggregation.fromOrderedPublicKeys([
-    CompressedPublicKey.parse(G),
-    CompressedPublicKey.parse(TWO_G),
-  ]);
-  assertEquals(aggregation.participantCount, 2);
-  assertEquals(aggregation.aggregatePublicKey().toBytes().length, 33);
-  assertThrows(() => aggregation.participantPublicKey(-1), MuSigStateError);
-  assertThrows(() => aggregation.participantPublicKey(2), MuSigStateError);
-  assertThrows(
-    () => aggregation.taprootTweak({ toBytes: () => new Uint8Array(31) }),
-    Secp256k1InputError,
-  );
+ffiTest(
+  'MuSig2 validates public state, participant indexes, and signing keys',
+  () => {
+    assertThrows(
+      () => MuSigKeyAggregation.fromOrderedPublicKeys([]),
+      MuSigStateError,
+    );
+    const aggregation = MuSigKeyAggregation.fromOrderedPublicKeys([
+      CompressedPublicKey.parse(G),
+      CompressedPublicKey.parse(TWO_G),
+    ]);
+    assertEquals(aggregation.participantCount, 2);
+    assertEquals(aggregation.aggregatePublicKey().toBytes().length, 33);
+    assertThrows(() => aggregation.participantPublicKey(-1), MuSigStateError);
+    assertThrows(() => aggregation.participantPublicKey(2), MuSigStateError);
+    assertThrows(
+      () => aggregation.taprootTweak({ toBytes: () => new Uint8Array(31) }),
+      Secp256k1InputError,
+    );
 
-  const digest = Digest32.fromBytes(new Uint8Array(32));
-  const invalidKeys: MuSigSigningKey[] = [
-    { exportBytes: () => new Uint8Array(31) },
-    { exportBytes: () => new Uint8Array(32) },
-    { exportBytes: () => N() },
-    {
-      exportBytes: () => {
-        throw new Error('destroyed');
+    const digest = Digest32.fromBytes(new Uint8Array(32));
+    const invalidKeys: MuSigSigningKey[] = [
+      { exportBytes: () => new Uint8Array(31) },
+      { exportBytes: () => new Uint8Array(32) },
+      { exportBytes: () => N() },
+      {
+        exportBytes: () => {
+          throw new Error('destroyed');
+        },
       },
-    },
-  ];
-  for (const secretKey of invalidKeys) {
+    ];
+    for (const secretKey of invalidKeys) {
+      assertThrows(
+        () =>
+          MuSigSecretNonce.generate({
+            participantIndex: 0,
+            secretKey,
+            digest,
+            keyAggregation: aggregation,
+          }),
+        MuSigStateError,
+      );
+    }
     assertThrows(
       () =>
         MuSigSecretNonce.generate({
-          participantIndex: 0,
-          secretKey,
+          participantIndex: Number.NaN,
+          secretKey: { exportBytes: () => scalar(1) },
           digest,
           keyAggregation: aggregation,
         }),
       MuSigStateError,
     );
-  }
-  assertThrows(
-    () =>
-      MuSigSecretNonce.generate({
-        participantIndex: Number.NaN,
-        secretKey: { exportBytes: () => scalar(1) },
-        digest,
-        keyAggregation: aggregation,
-      }),
-    MuSigStateError,
-  );
 
-  assertEquals(new MuSigNativeError('test').operation, 'test');
-  assertEquals(new MuSigRandomError({ cause: 'test' }).cause, 'test');
-});
+    assertEquals(new MuSigNativeError('test').operation, 'test');
+    assertEquals(new MuSigRandomError({ cause: 'test' }).cause, 'test');
+  },
+);
 
-Deno.test('MuSig2 rejects generation key, index, and aggregate bindings', () => {
-  const aggregation = MuSigKeyAggregation.fromOrderedPublicKeys([
-    CompressedPublicKey.parse(G),
-    CompressedPublicKey.parse(TWO_G),
-  ]);
-  const digest = Digest32.fromBytes(new Uint8Array(32));
-  assertThrows(
-    () =>
-      MuSigSecretNonce.generate({
-        participantIndex: 0,
-        secretKey: { exportBytes: () => scalar(2) },
-        digest,
-        keyAggregation: aggregation,
-      }),
-    MuSigStateError,
-  );
+ffiTest(
+  'MuSig2 rejects generation key, index, and aggregate bindings',
+  () => {
+    const aggregation = MuSigKeyAggregation.fromOrderedPublicKeys([
+      CompressedPublicKey.parse(G),
+      CompressedPublicKey.parse(TWO_G),
+    ]);
+    const digest = Digest32.fromBytes(new Uint8Array(32));
+    assertThrows(
+      () =>
+        MuSigSecretNonce.generate({
+          participantIndex: 0,
+          secretKey: { exportBytes: () => scalar(2) },
+          digest,
+          keyAggregation: aggregation,
+        }),
+      MuSigStateError,
+    );
 
-  const nonce = MuSigSecretNonce.generate({
-    participantIndex: 0,
-    secretKey: { exportBytes: () => scalar(1) },
-    digest,
-    keyAggregation: aggregation,
-  });
-  assertThrows(
-    () =>
-      MuSigAggregateNonce.aggregate(aggregation, [
-        { participantIndex: Number.NaN, publicNonce: nonce.publicNonce },
-      ]),
-    MuSigStateError,
-  );
-
-  const second = MuSigSecretNonce.generate({
-    participantIndex: 1,
-    secretKey: { exportBytes: () => scalar(2) },
-    digest,
-    keyAggregation: aggregation,
-  });
-  const publicNonces = [
-    nonce.indexedPublicNonce(),
-    second.indexedPublicNonce(),
-  ];
-  assertEquals(
-    MuSigSession.tryCreate({
-      aggregateNonce: {
-        toBytes: () => new Uint8Array(1),
-      } as never,
-      publicNonces,
+    const nonce = MuSigSecretNonce.generate({
+      participantIndex: 0,
+      secretKey: { exportBytes: () => scalar(1) },
       digest,
       keyAggregation: aggregation,
-    }),
-    null,
-  );
-});
+    });
+    assertThrows(
+      () =>
+        MuSigAggregateNonce.aggregate(aggregation, [
+          { participantIndex: Number.NaN, publicNonce: nonce.publicNonce },
+        ]),
+      MuSigStateError,
+    );
 
-Deno.test('MuSig2 wraps Web Crypto randomness failure', () => {
+    const second = MuSigSecretNonce.generate({
+      participantIndex: 1,
+      secretKey: { exportBytes: () => scalar(2) },
+      digest,
+      keyAggregation: aggregation,
+    });
+    const publicNonces = [
+      nonce.indexedPublicNonce(),
+      second.indexedPublicNonce(),
+    ];
+    assertEquals(
+      MuSigSession.tryCreate({
+        aggregateNonce: {
+          toBytes: () => new Uint8Array(1),
+        } as never,
+        publicNonces,
+        digest,
+        keyAggregation: aggregation,
+      }),
+      null,
+    );
+  },
+);
+
+ffiTest('MuSig2 wraps Web Crypto randomness failure', () => {
   const aggregation = MuSigKeyAggregation.fromOrderedPublicKeys([
     CompressedPublicKey.parse(G),
   ]);
@@ -301,10 +313,10 @@ Deno.test('MuSig2 wraps Web Crypto randomness failure', () => {
   let calls = 0;
   Object.defineProperty(crypto, 'getRandomValues', {
     configurable: true,
-    value<T extends ArrayBufferView | null>(array: T): T {
+    value(array: Uint8Array): Uint8Array {
       calls++;
       if (calls === 2) throw new Error('randomness unavailable');
-      return original(array as ArrayBufferView) as unknown as T;
+      return original(array);
     },
   });
   try {
@@ -327,7 +339,7 @@ Deno.test('MuSig2 wraps Web Crypto randomness failure', () => {
   }
 });
 
-Deno.test('MuSig2 fails closed when an FFI buffer has no pointer', () => {
+ffiTest('MuSig2 fails closed when an FFI buffer has no pointer', () => {
   const descriptor = Object.getOwnPropertyDescriptor(Deno.UnsafePointer, 'of')!;
   Object.defineProperty(Deno.UnsafePointer, 'of', {
     configurable: true,
@@ -346,7 +358,7 @@ Deno.test('MuSig2 fails closed when an FFI buffer has no pointer', () => {
   }
 });
 
-Deno.test('MuSig2 rejects prototype-polluted session identity storage', () => {
+ffiTest('MuSig2 rejects prototype-polluted session identity storage', () => {
   const aggregation = MuSigKeyAggregation.fromOrderedPublicKeys([
     CompressedPublicKey.parse(G),
   ]);

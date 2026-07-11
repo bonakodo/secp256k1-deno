@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertThrows } from './deps.ts';
+import { assert, assertEquals, assertThrows, ffiTest } from './deps.ts';
 import {
   Bip324InputError,
   Bip324KeyExchange,
@@ -29,7 +29,7 @@ Deno.test('EllSwiftEncoding validates only length and copies bytes', () => {
   assertEquals(error.code, 'invalid-ellswift-length');
 });
 
-Deno.test('role-bound exchanges derive the same BIP324 shared secret', () => {
+ffiTest('role-bound exchanges derive the same BIP324 shared secret', () => {
   using initiator = Bip324KeyExchange.initiator();
   using responder = Bip324KeyExchange.responder();
   const initiatorEncoding = initiator.encoding;
@@ -48,19 +48,22 @@ Deno.test('role-bound exchanges derive the same BIP324 shared secret', () => {
   }
 });
 
-Deno.test('exchange encoding getters and outputs are mutation-isolated', () => {
-  using exchange = Bip324KeyExchange.initiator();
-  const first = exchange.encoding;
-  const expected = first.toBytes();
-  const mutated = first.toBytes();
-  mutated.fill(0);
+ffiTest(
+  'exchange encoding getters and outputs are mutation-isolated',
+  () => {
+    using exchange = Bip324KeyExchange.initiator();
+    const first = exchange.encoding;
+    const expected = first.toBytes();
+    const mutated = first.toBytes();
+    mutated.fill(0);
 
-  assert(first !== exchange.encoding);
-  assertEquals(first.toBytes(), expected);
-  assertEquals(exchange.encoding.toBytes(), expected);
-});
+    assert(first !== exchange.encoding);
+    assertEquals(first.toBytes(), expected);
+    assertEquals(exchange.encoding.toBytes(), expected);
+  },
+);
 
-Deno.test('exchange is consumed after successful derivation', () => {
+ffiTest('exchange is consumed after successful derivation', () => {
   using initiator = Bip324KeyExchange.initiator();
   using responder = Bip324KeyExchange.responder();
   const responderEncoding = responder.encoding;
@@ -73,7 +76,7 @@ Deno.test('exchange is consumed after successful derivation', () => {
   assertEquals(error.code, 'exchange-consumed');
 });
 
-Deno.test('exchange remains consumed after derivation input failure', () => {
+ffiTest('exchange remains consumed after derivation input failure', () => {
   using exchange = Bip324KeyExchange.initiator();
   const inputError = assertThrows(
     () =>
@@ -94,7 +97,7 @@ Deno.test('exchange remains consumed after derivation input failure', () => {
   assertEquals(stateError.code, 'exchange-consumed');
 });
 
-Deno.test('destroy consumes an exchange without hiding its encoding', () => {
+ffiTest('destroy consumes an exchange without hiding its encoding', () => {
   using exchange = Bip324KeyExchange.responder();
   const encoding = exchange.encoding.toBytes();
   exchange.destroy();
@@ -111,42 +114,45 @@ Deno.test('destroy consumes an exchange without hiding its encoding', () => {
   assertEquals(error.code, 'exchange-consumed');
 });
 
-Deno.test('shared secrets are one-shot, disposable, and mutation-isolated', () => {
-  using initiator = Bip324KeyExchange.initiator();
-  using responder = Bip324KeyExchange.responder();
-  const initiatorEncoding = initiator.encoding;
-  const responderEncoding = responder.encoding;
-  using first = initiator.deriveSharedSecret(responderEncoding);
-  using second = responder.deriveSharedSecret(initiatorEncoding);
+ffiTest(
+  'shared secrets are one-shot, disposable, and mutation-isolated',
+  () => {
+    using initiator = Bip324KeyExchange.initiator();
+    using responder = Bip324KeyExchange.responder();
+    const initiatorEncoding = initiator.encoding;
+    const responderEncoding = responder.encoding;
+    using first = initiator.deriveSharedSecret(responderEncoding);
+    using second = responder.deriveSharedSecret(initiatorEncoding);
 
-  const exposed = first.consumeBytes();
-  const expected = second.consumeBytes();
-  try {
-    exposed[0] ^= 0xff;
-    assert(exposed.some((byte, index) => byte !== expected[index]));
-    const error = assertThrows(() => first.consumeBytes(), Bip324StateError);
-    assertEquals(error.code, 'shared-secret-consumed');
-  } finally {
-    exposed.fill(0);
-    expected.fill(0);
-  }
+    const exposed = first.consumeBytes();
+    const expected = second.consumeBytes();
+    try {
+      exposed[0] ^= 0xff;
+      assert(exposed.some((byte, index) => byte !== expected[index]));
+      const error = assertThrows(() => first.consumeBytes(), Bip324StateError);
+      assertEquals(error.code, 'shared-secret-consumed');
+    } finally {
+      exposed.fill(0);
+      expected.fill(0);
+    }
 
-  using disposableInitiator = Bip324KeyExchange.initiator();
-  using disposableResponder = Bip324KeyExchange.responder();
-  using disposable = disposableInitiator.deriveSharedSecret(
-    disposableResponder.encoding,
-  );
-  disposable.destroy();
-  disposable.destroy();
-  const destroyed = assertThrows(
-    () => disposable.consumeBytes(),
-    Bip324StateError,
-  );
-  assertEquals(destroyed.code, 'shared-secret-consumed');
-  assert(!('toJSON' in disposable));
-});
+    using disposableInitiator = Bip324KeyExchange.initiator();
+    using disposableResponder = Bip324KeyExchange.responder();
+    using disposable = disposableInitiator.deriveSharedSecret(
+      disposableResponder.encoding,
+    );
+    disposable.destroy();
+    disposable.destroy();
+    const destroyed = assertThrows(
+      () => disposable.consumeBytes(),
+      Bip324StateError,
+    );
+    assertEquals(destroyed.code, 'shared-secret-consumed');
+    assert(!('toJSON' in disposable));
+  },
+);
 
-Deno.test('native callback matches an upstream BIP324 XDH vector', () => {
+ffiTest('native callback matches an upstream BIP324 XDH vector', () => {
   // First vector from secp256k1/src/modules/ellswift/tests_impl.h.
   const secretKey = hex(
     '61062ea5071d800bbfd59e2e8b53d47d194b095ae5a4df04936b49772ef0d4d7',

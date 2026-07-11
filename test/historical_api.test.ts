@@ -1,4 +1,4 @@
-import { assert, assertEquals } from './deps.ts';
+import { assert, assertEquals, ffiTest } from './deps.ts';
 import { Digest32 } from '../src/api/digest.ts';
 import { PublicKey } from '../src/api/keys.ts';
 import { verifyHistoricalEcdsa } from '../src/historical.ts';
@@ -19,13 +19,13 @@ const HIGH_S = hex(
   'd68dde77426c80ab379ea7d3590397a32d0c28d9a95835053c5d8b2e854389dd',
 );
 
-Deno.test('historical verifier accepts strict and high-S DER', () => {
+ffiTest('historical verifier accepts strict and high-S DER', () => {
   const digest = Digest32.fromBytes(DIGEST);
   assert(verifyHistoricalEcdsa(strictDer(R, LOW_S), digest, PUBLIC_KEY));
   assert(verifyHistoricalEcdsa(strictDer(R, HIGH_S), digest, PUBLIC_KEY));
 });
 
-Deno.test('historical verifier accepts pre-BIP66 lax DER forms', () => {
+ffiTest('historical verifier accepts pre-BIP66 lax DER forms', () => {
   const digest = Digest32.fromBytes(DIGEST);
   const wrongSequenceLength = strictDer(R, LOW_S);
   wrongSequenceLength[1] = 0;
@@ -59,7 +59,7 @@ Deno.test('historical verifier accepts pre-BIP66 lax DER forms', () => {
   assert(verifyHistoricalEcdsa(longLengths, digest, PUBLIC_KEY));
 });
 
-Deno.test('historical verifier accepts hybrid public keys', () => {
+ffiTest('historical verifier accepts hybrid public keys', () => {
   const publicKey = PublicKey.parse(PUBLIC_KEY);
   const hybrid = publicKey.toUncompressedBytes();
   hybrid[0] = (hybrid[64] & 1) === 0 ? 0x06 : 0x07;
@@ -72,37 +72,40 @@ Deno.test('historical verifier accepts hybrid public keys', () => {
   );
 });
 
-Deno.test('historical verifier returns false for attacker-controlled input', () => {
-  const digest = Digest32.fromBytes(DIGEST);
-  const malformed = [
-    new Uint8Array(),
-    Uint8Array.of(0x30),
-    Uint8Array.of(0x31, 0, 2, 0, 2, 0),
-    Uint8Array.of(0x30, 0, 2, 0),
-    Uint8Array.of(0x30, 0, 2, 0, 2, 0),
-    Uint8Array.of(0x30, 0, 2, 0x88),
-  ];
-  for (const signature of malformed) {
+ffiTest(
+  'historical verifier returns false for attacker-controlled input',
+  () => {
+    const digest = Digest32.fromBytes(DIGEST);
+    const malformed = [
+      new Uint8Array(),
+      Uint8Array.of(0x30),
+      Uint8Array.of(0x31, 0, 2, 0, 2, 0),
+      Uint8Array.of(0x30, 0, 2, 0),
+      Uint8Array.of(0x30, 0, 2, 0, 2, 0),
+      Uint8Array.of(0x30, 0, 2, 0x88),
+    ];
+    for (const signature of malformed) {
+      assertEquals(
+        verifyHistoricalEcdsa(signature, digest, PUBLIC_KEY),
+        false,
+      );
+    }
     assertEquals(
-      verifyHistoricalEcdsa(signature, digest, PUBLIC_KEY),
+      verifyHistoricalEcdsa(strictDer(R, LOW_S), digest, new Uint8Array()),
       false,
     );
-  }
-  assertEquals(
-    verifyHistoricalEcdsa(strictDer(R, LOW_S), digest, new Uint8Array()),
-    false,
-  );
-  const changedDigest = DIGEST.slice();
-  changedDigest[0] ^= 1;
-  assertEquals(
-    verifyHistoricalEcdsa(
-      strictDer(R, LOW_S),
-      Digest32.fromBytes(changedDigest),
-      PUBLIC_KEY,
-    ),
-    false,
-  );
-});
+    const changedDigest = DIGEST.slice();
+    changedDigest[0] ^= 1;
+    assertEquals(
+      verifyHistoricalEcdsa(
+        strictDer(R, LOW_S),
+        Digest32.fromBytes(changedDigest),
+        PUBLIC_KEY,
+      ),
+      false,
+    );
+  },
+);
 
 function strictDer(r: Uint8Array, s: Uint8Array): Uint8Array {
   const positiveR = (r[0] & 0x80) === 0 ? r : Uint8Array.from([0, ...r]);

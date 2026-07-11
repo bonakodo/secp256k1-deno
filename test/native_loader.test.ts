@@ -1251,7 +1251,7 @@ async function runWithScopedFfi(
   script: string,
 ): Promise<Deno.CommandOutput> {
   const module = `data:application/typescript,${encodeURIComponent(script)}`;
-  return await new Deno.Command(Deno.execPath(), {
+  return await new Deno.Command('deno', {
     args: [
       'run',
       '--no-lock',

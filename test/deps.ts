@@ -5,6 +5,14 @@ export {
   assertThrows,
 } from 'jsr:@std/assert@1';
 
+// The native loader intentionally retains its dynamic library for the process.
+export function ffiTest(
+  name: string,
+  fn: () => void | Promise<void>,
+): void {
+  Deno.test({ name, fn, sanitizeResources: false });
+}
+
 export const ONE = () => new Uint8Array(32).fill(1, 31, 32);
 // deno-fmt-ignore
 export const N = () => new Uint8Array([

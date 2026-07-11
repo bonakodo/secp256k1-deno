@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertNotEquals } from './deps.ts';
+import { assert, assertEquals, assertNotEquals, ffiTest } from './deps.ts';
 import { XOnlyPublicKey } from '../src/api/keys.ts';
 import { SecretKey } from '../src/signing.ts';
 import {
@@ -8,19 +8,22 @@ import {
   taprootTweakSecretKey,
 } from '../src/taproot.ts';
 
-Deno.test('BIP341 no-tree wallet vector derives the expected output key', () => {
-  const internalKey = XOnlyPublicKey.parse(
-    hex('d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d'),
-  );
-  const result = taprootTweakPublicKey({ internalKey, merkleRoot: null });
-  assertEquals(
-    result.outputKey.toBytes(),
-    hex('53a1f6e454df1aa2776a2814a721372d6258050de330b3c6d10ee8f4e0dda343'),
-  );
-  assert(checkTaprootTweak({ internalKey, merkleRoot: null, ...result }));
-});
+ffiTest(
+  'BIP341 no-tree wallet vector derives the expected output key',
+  () => {
+    const internalKey = XOnlyPublicKey.parse(
+      hex('d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d'),
+    );
+    const result = taprootTweakPublicKey({ internalKey, merkleRoot: null });
+    assertEquals(
+      result.outputKey.toBytes(),
+      hex('53a1f6e454df1aa2776a2814a721372d6258050de330b3c6d10ee8f4e0dda343'),
+    );
+    assert(checkTaprootTweak({ internalKey, merkleRoot: null, ...result }));
+  },
+);
 
-Deno.test('BIP341 script-tree wallet vector derives key and parity', () => {
+ffiTest('BIP341 script-tree wallet vector derives key and parity', () => {
   const internalKey = XOnlyPublicKey.parse(
     hex('187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27'),
   );
@@ -45,7 +48,7 @@ Deno.test('BIP341 script-tree wallet vector derives key and parity', () => {
   );
 });
 
-Deno.test('null tree is distinct from an all-zero Merkle root', () => {
+ffiTest('null tree is distinct from an all-zero Merkle root', () => {
   const internalKey = XOnlyPublicKey.parse(
     hex('d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d'),
   );
@@ -66,7 +69,7 @@ Deno.test('null tree is distinct from an all-zero Merkle root', () => {
   );
 });
 
-Deno.test('secret tweaking normalizes an odd-Y internal key', () => {
+ffiTest('secret tweaking normalizes an odd-Y internal key', () => {
   using internalSecret = SecretKey.fromBytes(scalar(6));
   const original = internalSecret.exportBytes();
   const internalPublic = internalSecret.xOnlyPublicKey();

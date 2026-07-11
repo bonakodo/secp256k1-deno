@@ -1,4 +1,10 @@
-import { assert, assertEquals, assertNotEquals, assertThrows } from './deps.ts';
+import {
+  assert,
+  assertEquals,
+  assertNotEquals,
+  assertThrows,
+  ffiTest,
+} from './deps.ts';
 import { Digest32 } from '../src/api/digest.ts';
 import { verifyEcdsa, verifyTaprootSignature } from '../src/api/verify.ts';
 import {
@@ -13,37 +19,43 @@ const GENERATOR = hex(
   '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
 );
 
-Deno.test('SecretKey copies, derives keys, and destroys deterministically', () => {
-  const input = scalar(1);
-  const key = SecretKey.fromBytes(input);
-  input.fill(9);
-  assertEquals(key.exportBytes(), scalar(1));
-  assertEquals(key.publicKey().toCompressedBytes(), GENERATOR);
-  assertEquals(key.xOnlyPublicKey().key.toBytes(), GENERATOR.slice(1));
-  assertEquals(key.xOnlyPublicKey().parity, 0);
-  assertEquals(JSON.stringify(key), '{}');
-  assertEquals(String(key).includes(bytesToHex(scalar(1))), false);
+ffiTest(
+  'SecretKey copies, derives keys, and destroys deterministically',
+  () => {
+    const input = scalar(1);
+    const key = SecretKey.fromBytes(input);
+    input.fill(9);
+    assertEquals(key.exportBytes(), scalar(1));
+    assertEquals(key.publicKey().toCompressedBytes(), GENERATOR);
+    assertEquals(key.xOnlyPublicKey().key.toBytes(), GENERATOR.slice(1));
+    assertEquals(key.xOnlyPublicKey().parity, 0);
+    assertEquals(JSON.stringify(key), '{}');
+    assertEquals(String(key).includes(bytesToHex(scalar(1))), false);
 
-  const exported = key.exportBytes();
-  exported.fill(8);
-  assertEquals(key.exportBytes(), scalar(1));
+    const exported = key.exportBytes();
+    exported.fill(8);
+    assertEquals(key.exportBytes(), scalar(1));
 
-  key.destroy();
-  assert(key.destroyed);
-  key.destroy();
-  assertThrows(() => key.exportBytes(), SecretKeyDestroyedError);
-  assertThrows(() => key.publicKey(), SecretKeyDestroyedError);
-});
+    key.destroy();
+    assert(key.destroyed);
+    key.destroy();
+    assertThrows(() => key.exportBytes(), SecretKeyDestroyedError);
+    assertThrows(() => key.publicKey(), SecretKeyDestroyedError);
+  },
+);
 
-Deno.test('SecretKey.generate returns independently disposable valid keys', () => {
-  using first = SecretKey.generate();
-  using second = SecretKey.generate();
-  assertEquals(first.exportBytes().length, 32);
-  assertEquals(second.exportBytes().length, 32);
-  assertNotEquals(first.exportBytes(), new Uint8Array(32));
-});
+ffiTest(
+  'SecretKey.generate returns independently disposable valid keys',
+  () => {
+    using first = SecretKey.generate();
+    using second = SecretKey.generate();
+    assertEquals(first.exportBytes().length, 32);
+    assertEquals(second.exportBytes().length, 32);
+    assertNotEquals(first.exportBytes(), new Uint8Array(32));
+  },
+);
 
-Deno.test('signEcdsa is deterministic, low-S, and verifies', () => {
+ffiTest('signEcdsa is deterministic, low-S, and verifies', () => {
   using key = SecretKey.fromBytes(scalar(1));
   const digest = Digest32.fromBytes(new Uint8Array(32).fill(0x42));
   const first = signEcdsa(digest, key);
@@ -59,7 +71,7 @@ Deno.test('signEcdsa is deterministic, low-S, and verifies', () => {
   assertEquals(error.cause, 'fault');
 });
 
-Deno.test('signTaprootSignature post-verifies BIP340 signatures', () => {
+ffiTest('signTaprootSignature post-verifies BIP340 signatures', () => {
   using key = SecretKey.fromBytes(scalar(3));
   assertEquals(
     key.xOnlyPublicKey().key.toBytes(),

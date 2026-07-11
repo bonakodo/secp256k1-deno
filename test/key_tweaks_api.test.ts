@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows, N } from './deps.ts';
+import { assertEquals, assertThrows, ffiTest, N } from './deps.ts';
 import { Secp256k1InputError } from '../src/api/input.ts';
 import {
   addTweakToPublicKey,
@@ -25,7 +25,7 @@ Deno.test('Tweak32 copies exact scalars from zero through n-1', () => {
   assertThrows(() => Tweak32.fromBytes(N()), Secp256k1InputError);
 });
 
-Deno.test('additive secret and public tweaks agree and do not mutate', () => {
+ffiTest('additive secret and public tweaks agree and do not mutate', () => {
   using original = SecretKey.fromBytes(scalar(1));
   const originalPublic = original.publicKey();
   const tweak = Tweak32.fromBytes(scalar(1));
@@ -38,7 +38,7 @@ Deno.test('additive secret and public tweaks agree and do not mutate', () => {
   assertEquals(original.exportBytes(), scalar(1));
 });
 
-Deno.test('zero tweak returns independent key values', () => {
+ffiTest('zero tweak returns independent key values', () => {
   using original = SecretKey.fromBytes(scalar(1));
   const zero = Tweak32.fromBytes(new Uint8Array(32));
   using copied = addTweakToSecretKey(original, zero);
@@ -51,7 +51,7 @@ Deno.test('zero tweak returns independent key values', () => {
   );
 });
 
-Deno.test('additive cancellation has typed zero and infinity errors', () => {
+ffiTest('additive cancellation has typed zero and infinity errors', () => {
   using key = SecretKey.fromBytes(scalar(1));
   const minusOne = N();
   minusOne[31] -= 1;
