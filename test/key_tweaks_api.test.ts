@@ -18,6 +18,9 @@ Deno.test('Tweak32 copies exact scalars from zero through n-1', () => {
   zero.fill(1);
   assertEquals(tweak.toBytes(), new Uint8Array(32));
   assertEquals(Tweak32.tryFromBytes(N()), null);
+  const aboveOrder = N();
+  aboveOrder[31]++;
+  assertEquals(Tweak32.tryFromBytes(aboveOrder), null);
   assertEquals(Tweak32.tryFromBytes(new Uint8Array(31)), null);
   assertThrows(() => Tweak32.fromBytes(N()), Secp256k1InputError);
 });

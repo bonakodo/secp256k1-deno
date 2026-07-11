@@ -9,6 +9,7 @@ import {
   classifyNativeCapabilities,
   createNativeLoader,
   type NativeLibraryHandle,
+  type NativeLoader,
   type NativeLoaderRuntime,
 } from '../src/native/loader.ts';
 import {
@@ -805,6 +806,65 @@ Deno.test('environment access failure is structured and cached', () => {
   assertEquals(reads, 1);
 });
 
+Deno.test('unexpected candidate resolution failures propagate unchanged', () => {
+  const cause = new Error('target inspection failed');
+  const target = {
+    get os(): string {
+      throw cause;
+    },
+    arch: 'x86_64',
+  } as NativeTarget;
+  const loader = createNativeLoader({
+    target,
+    readPath: () => 'auto',
+    open: () => {
+      throw new Error('must not open');
+    },
+  });
+
+  assert(assertThrows(() => loader.initialize()) === cause);
+});
+
+function reentrantFailedLoader(): NativeLoader {
+  let reads = 0;
+  let reentered = false;
+  const symbols = new Proxy(fakeSymbols([]), {
+    get(target, property, receiver): unknown {
+      if (!reentered && typeof property === 'string') {
+        reentered = true;
+        try {
+          loader.initialize();
+        } catch {
+          // The nested initialization intentionally caches a terminal failure.
+        }
+      }
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const loader = createNativeLoader({
+    target: LINUX_X64,
+    readPath(): string | undefined {
+      reads++;
+      return reads === 1 ? '/absolute/libsecp256k1.so.6' : undefined;
+    },
+    open: () => fakeHandle(symbols),
+  });
+  return loader;
+}
+
+Deno.test('raw-symbol access fails closed after adversarial re-entrancy', () => {
+  assertThrows(
+    () => reentrantFailedLoader().getNativeSymbols(),
+    Error,
+    'unreachable loader state',
+  );
+  assertThrows(
+    () => reentrantFailedLoader().requireCapability('extrakeys'),
+    Error,
+    'unreachable loader state',
+  );
+});
+
 Deno.test('status has no loader side effects and exposes no handle', () => {
   let reads = 0;
   let opens = 0;
@@ -935,6 +995,12 @@ Deno.test('verification context rejects a null created pointer', () => {
   );
   assertEquals(error.code, 'context-create-failed');
   assertEquals(callbackCalled, false);
+});
+
+Deno.test('static context errors retain their stable code and message', () => {
+  const error = new NativeContextError('static-context-unavailable');
+  assertEquals(error.code, 'static-context-unavailable');
+  assertEquals(error.message, 'Native static context pointer is unavailable');
 });
 
 Deno.test('signing context uses NONE, randomizes, calls back, and destroys', () => {
