@@ -14,6 +14,7 @@ import type { Digest32 } from './api/digest.ts';
 import { PublicKey, XOnlyPublicKey } from './api/keys.ts';
 import { invalidInput } from './api/input.ts';
 import { EcdsaSignature, SchnorrSignature } from './api/signatures.ts';
+import { verifyEcdsa } from './api/verify.ts';
 import { withSigningContext, withStaticContext } from './native/context.ts';
 import { getNativeSymbols, requireCapability } from './native/loader.ts';
 
@@ -27,6 +28,44 @@ const PUBLIC_KEY_SIZE = 64;
 const KEYPAIR_SIZE = 96;
 const X_ONLY_PUBLIC_KEY_SIZE = 64;
 const EC_COMPRESSED = 258;
+
+/**
+ * Stable failure categories for native ECDSA signing.
+ *
+ * @since 1.0.0
+ */
+export type EcdsaSigningErrorCode =
+  | 'sign-failed'
+  | 'serialization-failed'
+  | 'invalid-signature'
+  | 'post-verification-failed';
+
+/**
+ * Reports a native ECDSA result that could not be safely returned.
+ *
+ * @since 1.0.0
+ */
+export class EcdsaSigningError extends Error {
+  /**
+   * Machine-readable signing failure category.
+   *
+   * @since 1.0.0
+   */
+  readonly code: EcdsaSigningErrorCode;
+
+  /**
+   * Creates a typed ECDSA signing failure.
+   *
+   * @param code Stable failure category.
+   * @param options Optional underlying cause.
+   * @since 1.0.0
+   */
+  constructor(code: EcdsaSigningErrorCode, options?: ErrorOptions) {
+    super(ecdsaSigningErrorMessage(code), options);
+    this.name = 'EcdsaSigningError';
+    this.code = code;
+  }
+}
 
 /**
  * Thrown when an operation attempts to use a destroyed secret key.
@@ -151,25 +190,31 @@ export class SecretKey implements Disposable {
     try {
       return withSigningContext((context) => {
         const internal = new Uint8Array(PUBLIC_KEY_SIZE);
-        if (
-          symbols.secp256k1_ec_pubkey_create(context, internal, secret) !== 1
-        ) {
-          throw new Error('Native public-key derivation failed');
-        }
         const serialized = new Uint8Array(33);
         const length = new BigUint64Array([33n]);
-        if (
-          symbols.secp256k1_ec_pubkey_serialize(
-              context,
-              serialized,
-              length,
-              internal,
-              EC_COMPRESSED,
-            ) !== 1 || length[0] !== 33n
-        ) {
-          throw new Error('Native public-key serialization failed');
+        try {
+          if (
+            symbols.secp256k1_ec_pubkey_create(context, internal, secret) !== 1
+          ) {
+            throw new Error('Native public-key derivation failed');
+          }
+          if (
+            symbols.secp256k1_ec_pubkey_serialize(
+                context,
+                serialized,
+                length,
+                internal,
+                EC_COMPRESSED,
+              ) !== 1 || length[0] !== 33n
+          ) {
+            throw new Error('Native public-key serialization failed');
+          }
+          return PublicKey.parse(serialized);
+        } finally {
+          internal.fill(0);
+          serialized.fill(0);
+          length.fill(0n);
         }
-        return PublicKey.parse(serialized);
       });
     } finally {
       secret.fill(0);
@@ -267,6 +312,7 @@ export class SecretKey implements Disposable {
  * @param secretKey A live disposable signing key.
  * @returns A valid immutable low-S ECDSA signature.
  * @throws {SecretKeyDestroyedError} If `secretKey` was destroyed.
+ * @throws {EcdsaSigningError} If native signing, serialization, validation, or post-verification fails.
  * @throws Native configuration, loading, or runtime errors unchanged.
  * @see https://www.rfc-editor.org/rfc/rfc6979
  * @since 1.0.0
@@ -276,43 +322,57 @@ export function signEcdsa(
   secretKey: SecretKey,
 ): EcdsaSignature {
   const symbols = getNativeSymbols();
+  const publicKey = secretKey.publicKey();
   const secret = secretKey.exportBytes();
   const message = digest.toBytes();
+  let compact: Uint8Array | undefined;
   try {
-    const compact = withSigningContext((context) => {
+    const serialized = withSigningContext((context) => {
       const internal = new Uint8Array(64);
-      if (
-        symbols.secp256k1_ecdsa_sign(
-          context,
-          internal,
-          message,
-          secret,
-          null,
-          null,
-        ) !== 1
-      ) {
-        throw new Error('Native ECDSA signing failed');
-      }
       const output = new Uint8Array(64);
-      if (
-        symbols.secp256k1_ecdsa_signature_serialize_compact(
-          context,
-          output,
-          internal,
-        ) !== 1
-      ) {
-        throw new Error('Native ECDSA signature serialization failed');
+      try {
+        if (
+          symbols.secp256k1_ecdsa_sign(
+            context,
+            internal,
+            message,
+            secret,
+            null,
+            null,
+          ) !== 1
+        ) {
+          throw new EcdsaSigningError('sign-failed');
+        }
+        if (
+          symbols.secp256k1_ecdsa_signature_serialize_compact(
+            context,
+            output,
+            internal,
+          ) !== 1
+        ) {
+          throw new EcdsaSigningError('serialization-failed');
+        }
+        return output;
+      } catch (cause) {
+        output.fill(0);
+        throw cause;
+      } finally {
+        internal.fill(0);
       }
-      return output;
     });
-    const signature = EcdsaSignature.fromBytes(compact);
+    compact = serialized;
+    const signature = EcdsaSignature.fromBytes(serialized);
     if (signature === null || !signature.isLowS()) {
-      throw new Error('Native ECDSA signing produced an invalid signature');
+      throw new EcdsaSigningError('invalid-signature');
+    }
+    if (!verifyEcdsa(signature, digest, publicKey)) {
+      throw new EcdsaSigningError('post-verification-failed');
     }
     return signature;
   } finally {
     secret.fill(0);
     message.fill(0);
+    compact?.fill(0);
   }
 }
 
@@ -401,4 +461,17 @@ function isValidSecretKey(bytes: Uint8Array): boolean {
   return withStaticContext((context) =>
     symbols.secp256k1_ec_seckey_verify(context, bytes) === 1
   );
+}
+
+function ecdsaSigningErrorMessage(code: EcdsaSigningErrorCode): string {
+  switch (code) {
+    case 'sign-failed':
+      return 'Native ECDSA signing failed';
+    case 'serialization-failed':
+      return 'Native ECDSA signature serialization failed';
+    case 'invalid-signature':
+      return 'Native ECDSA signing produced an invalid signature';
+    case 'post-verification-failed':
+      return 'Native ECDSA signature post-verification failed';
+  }
 }

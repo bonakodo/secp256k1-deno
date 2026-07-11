@@ -2,6 +2,7 @@ import { assert, assertEquals, assertNotEquals, assertThrows } from './deps.ts';
 import { Digest32 } from '../src/api/digest.ts';
 import { verifyEcdsa, verifyTaprootSignature } from '../src/api/verify.ts';
 import {
+  EcdsaSigningError,
   SecretKey,
   SecretKeyDestroyedError,
   signEcdsa,
@@ -50,6 +51,12 @@ Deno.test('signEcdsa is deterministic, low-S, and verifies', () => {
   assert(first.isLowS());
   assertEquals(first.toCompact(), second.toCompact());
   assert(verifyEcdsa(first, digest, key.publicKey()));
+
+  const error = new EcdsaSigningError('post-verification-failed', {
+    cause: 'fault',
+  });
+  assertEquals(error.code, 'post-verification-failed');
+  assertEquals(error.cause, 'fault');
 });
 
 Deno.test('signTaprootSignature post-verifies BIP340 signatures', () => {

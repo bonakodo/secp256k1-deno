@@ -918,7 +918,7 @@ const SECRET_NONCES = new WeakMap<MuSigSecretNonce, SecretNonceState>();
  * @see https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki
  * @since 1.0.0
  */
-export class MuSigSecretNonce {
+export class MuSigSecretNonce implements Disposable {
   private constructor(state: SecretNonceState) {
     SECRET_NONCES.set(this, state);
   }
@@ -1054,6 +1054,32 @@ export class MuSigSecretNonce {
   }
 
   /**
+   * Permanently consumes this handle and overwrites its native secret nonce.
+   *
+   * Disposal is idempotent. The participant index and public nonce remain
+   * available because they contain no secret material, but every later signing
+   * attempt fails with the same `nonce-already-consumed` state error as nonce
+   * reuse after signing.
+   *
+   * @since 1.0.0
+   */
+  destroy(): void {
+    const state = secretNonceState(this);
+    if (state.consumed) return;
+    state.consumed = true;
+    state.nativeSecretNonce.fill(0);
+  }
+
+  /**
+   * Disposes this secret nonce for `using` declarations.
+   *
+   * @since 1.0.0
+   */
+  [Symbol.dispose](): void {
+    this.destroy();
+  }
+
+  /**
    * Returns this nonce's public indexed protocol value.
    *
    * @returns A detached participant index and immutable public nonce.
@@ -1179,14 +1205,7 @@ export class MuSigSession {
    */
   signPartial(options: MuSigPartialSigning): IndexedMuSigPartialSignature {
     const session = sessionState(this);
-    const nonce = secretNonceState(options.secretNonce);
-    if (nonce.consumed) {
-      throw new MuSigStateError(
-        'nonce-already-consumed',
-        'MuSig2 secret nonce has already been consumed',
-      );
-    }
-    nonce.consumed = true;
+    const nonce = consumeSecretNonce(options.secretNonce);
 
     let secret: Uint8Array | undefined;
     let keypair: Uint8Array | undefined;
@@ -1395,6 +1414,18 @@ function keyAggregationState(
 function secretNonceState(nonce: MuSigSecretNonce): SecretNonceState {
   const state = SECRET_NONCES.get(nonce);
   if (state === undefined) throw new TypeError('Invalid MuSigSecretNonce');
+  return state;
+}
+
+function consumeSecretNonce(nonce: MuSigSecretNonce): SecretNonceState {
+  const state = secretNonceState(nonce);
+  if (state.consumed) {
+    throw new MuSigStateError(
+      'nonce-already-consumed',
+      'MuSig2 secret nonce has already been consumed',
+    );
+  }
+  state.consumed = true;
   return state;
 }
 

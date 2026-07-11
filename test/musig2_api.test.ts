@@ -242,6 +242,46 @@ Deno.test('MuSig2 consumes a nonce before wrong-key and reuse failures', () => {
   assertEquals(reuse.code, 'nonce-already-consumed');
 });
 
+Deno.test('MuSig2 secret nonces dispose idempotently without hiding public state', () => {
+  const flow = twoPartyFlow();
+  const nonce = flow.secretNonces[0];
+  const expectedPublicNonce = nonce.publicNonce.toBytes();
+  const detached = nonce.publicNonce.toBytes();
+  detached.fill(0);
+
+  assertEquals(nonce.consumed, false);
+  nonce.destroy();
+  assertEquals(nonce.consumed, true);
+  assertEquals(nonce.participantIndex, 0);
+  assertEquals(nonce.publicNonce.toBytes(), expectedPublicNonce);
+  assertEquals(
+    nonce.indexedPublicNonce().publicNonce.toBytes(),
+    expectedPublicNonce,
+  );
+
+  nonce.destroy();
+  nonce[Symbol.dispose]();
+  const error = assertThrows(
+    () =>
+      flow.session.signPartial({
+        secretNonce: nonce,
+        secretKey: new TestSigningKey(1),
+      }),
+    MuSigStateError,
+  );
+  assertEquals(error.code, 'nonce-already-consumed');
+});
+
+Deno.test('MuSig2 secret nonces support using disposal', () => {
+  const flow = twoPartyFlow();
+  const nonce = flow.secretNonces[0];
+  {
+    using scoped = nonce;
+    assertEquals(scoped.consumed, false);
+  }
+  assertEquals(nonce.consumed, true);
+});
+
 Deno.test('MuSig2 consumes a nonce before wrong aggregation binding fails', () => {
   const flow = twoPartyFlow();
   const otherAggregation = MuSigKeyAggregation.fromOrderedPublicKeys([
