@@ -26,7 +26,7 @@ export const HALF_N = () => scalarFromBigInt(N_BIGINT / 2n);
 
 export const HALF_N_PLUS_ONE = () => scalarFromBigInt(N_BIGINT / 2n + 1n);
 
-export function hexToBytes(hex: string): Uint8Array<ArrayBuffer> {
+export function hexToBytes(hex: string) {
   if (hex.length % 2 !== 0) throw new Error('hex length must be even');
   const out = new Uint8Array(hex.length / 2);
   for (let i = 0; i < out.length; i++) {
@@ -35,7 +35,7 @@ export function hexToBytes(hex: string): Uint8Array<ArrayBuffer> {
   return out;
 }
 
-export function scalarFromBigInt(value: bigint): Uint8Array<ArrayBuffer> {
+export function scalarFromBigInt(value: bigint) {
   const out = new Uint8Array(32);
   let remaining = value;
   for (let i = 31; i >= 0; i--) {

@@ -122,25 +122,31 @@ jobs:
           --allow-read=.
           --allow-run
 
+      - name: Enforce coverage
+        if: matrix.deno == 'latest' && matrix.runner == 'ubuntu-24.04'
+        run: deno task coverage
+
       - name: Verify auto loader on Linux
         if: runner.os == 'Linux'
         shell: bash
         run: |
           DENO_SECP256K1_PATH=auto LD_LIBRARY_PATH="$LIBSECP_DIR" \
-            deno eval --no-lock \
-              --allow-env=DENO_SECP256K1_PATH --allow-ffi \
-              'import { initializeNative } from "./src/native/mod.ts";
-               if (initializeNative().state !== "loaded") throw new Error("auto load failed");'
+            deno run --no-lock --no-prompt \
+              --allow-env=DENO_SECP256K1_PATH --allow-ffi - <<'EOF'
+          import { initializeNative } from "./src/native/mod.ts";
+          if (initializeNative().state !== "loaded") throw new Error("auto load failed");
+          EOF
 
       - name: Verify auto loader on macOS
         if: runner.os == 'macOS'
         shell: bash
         run: |
           DENO_SECP256K1_PATH=auto DYLD_LIBRARY_PATH="$LIBSECP_DIR" \
-            deno eval --no-lock \
-              --allow-env=DENO_SECP256K1_PATH --allow-ffi \
-              'import { initializeNative } from "./src/native/mod.ts";
-               if (initializeNative().state !== "loaded") throw new Error("auto load failed");'
+            deno run --no-lock --no-prompt \
+              --allow-env=DENO_SECP256K1_PATH --allow-ffi - <<'EOF'
+          import { initializeNative } from "./src/native/mod.ts";
+          if (initializeNative().state !== "loaded") throw new Error("auto load failed");
+          EOF
 
       - name: Check formatting
         if: matrix.deno == 'latest' && matrix.runner == 'ubuntu-24.04'

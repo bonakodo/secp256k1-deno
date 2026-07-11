@@ -36,7 +36,13 @@ const defaultContextRuntime: NativeContextRuntime = {
   },
 };
 
-/** Creates context helpers around an already core-validated symbol table. */
+/**
+ * Creates context helpers around an already core-validated symbol table.
+ *
+ * Before creating the first context, this invokes `secp256k1_selftest()`. The
+ * upstream library may abort the process on self-test failure instead of
+ * returning a catchable error.
+ */
 export function createNativeContextHelpers(
   symbols: LoadedCoreSymbols,
   runtime: NativeContextRuntime = defaultContextRuntime,

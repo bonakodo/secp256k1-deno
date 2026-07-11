@@ -81,8 +81,10 @@ library and its dependencies as part of your node's deployment.
 ## Verification
 
 Use non-throwing parsers for peer-controlled bytes. Native configuration and
-runtime failures still throw, so infrastructure failure is never mistaken for
-an invalid transaction or signature.
+runtime failures normally throw typed, catchable errors, so infrastructure
+failure is never mistaken for an invalid transaction or signature. The
+exception is libsecp256k1's `secp256k1_selftest()`, which runs before the first
+context use and may abort the process on failure.
 
 ```ts
 import {

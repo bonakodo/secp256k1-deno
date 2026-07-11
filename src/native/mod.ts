@@ -2,6 +2,10 @@
  * Capability-aware loading and diagnostics for a user-installed
  * libsecp256k1.
  *
+ * Native loading failures are reported as typed, catchable errors. Before the
+ * first context use, libsecp256k1's `secp256k1_selftest()` runs and may abort
+ * the process on failure instead of throwing.
+ *
  * @example Inspect capabilities after explicit initialization
  * ```ts
  * import {
