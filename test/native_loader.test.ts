@@ -43,6 +43,8 @@ function verifyContextCallbackTypes(
 ): void {
   // @ts-expect-error Native context pointers must not escape the callback.
   helpers.withSigningContext((context) => context);
+  // @ts-expect-error Retained context pointers must not escape the callback.
+  helpers.withStaticContext((context) => context);
   // @ts-expect-error Promises outlive the synchronously destroyed context.
   helpers.withSigningContext(async () => {
     await Promise.resolve();
@@ -53,6 +55,8 @@ function verifyContextCallbackTypes(
   helpers.withStaticContext(() => thenable);
   // @ts-expect-error Internal singleton helpers also forbid pointer escape.
   withSigningContext((context) => context);
+  // @ts-expect-error Retained singleton pointers must not escape either.
+  withStaticContext((context) => context);
   // @ts-expect-error Internal singleton helpers also forbid async callbacks.
   withStaticContext(async () => {
     await Promise.resolve();
@@ -469,7 +473,6 @@ const EXPECTED_NATIVE_ABI6 = {
 
 const EXPECTED_CAPABILITY_SYMBOLS = {
   core: [
-    'secp256k1_context_static',
     'secp256k1_selftest',
     'secp256k1_context_create',
     'secp256k1_context_destroy',
@@ -863,15 +866,8 @@ function coreSymbols(
   );
 }
 
-function contextRuntime(
-  events: string[],
-  staticContext: Deno.PointerValue,
-): NativeContextRuntime {
+function contextRuntime(events: string[]): NativeContextRuntime {
   return {
-    dereferenceStatic(): Deno.PointerValue {
-      events.push('dereference');
-      return staticContext;
-    },
     randomFill(seed): void {
       events.push(`random:${seed.length}`);
       seed.fill(7);
@@ -879,42 +875,55 @@ function contextRuntime(
   };
 }
 
-Deno.test('static context self-tests once before first use', () => {
+Deno.test('verification context self-tests, randomizes, and is retained', () => {
   const events: string[] = [];
-  const staticAddress = {} as Deno.PointerValue;
-  const staticContext = {} as Deno.PointerValue;
+  const verificationContext = {} as Deno.PointerValue;
   const symbols = coreSymbols({
-    secp256k1_context_static: staticAddress,
     secp256k1_selftest: () => events.push('selftest'),
+    secp256k1_context_create: (flags) => {
+      events.push(`create:${flags}`);
+      return verificationContext;
+    },
+    secp256k1_context_randomize: (context, seed) => {
+      assert(context === verificationContext);
+      assert(seed instanceof Uint8Array);
+      events.push(`randomize:${seed[0]}`);
+      return 1;
+    },
+    secp256k1_context_destroy: () => events.push('destroy'),
   }) as import('../src/native/symbols.ts').LoadedCoreSymbols;
   const helpers = createNativeContextHelpers(
     symbols,
-    contextRuntime(events, staticContext),
+    contextRuntime(events),
   );
 
   helpers.withStaticContext((context) => {
-    assert(context === staticContext);
+    assert(context === verificationContext);
     events.push('callback:1');
   });
-  helpers.withStaticContext(() => events.push('callback:2'));
+  helpers.withStaticContext((context) => {
+    assert(context === verificationContext);
+    events.push('callback:2');
+  });
 
   assertEquals(events, [
     'selftest',
-    'dereference',
+    `create:${SECP256K1_CONTEXT_NONE}`,
+    'random:32',
+    'randomize:7',
     'callback:1',
-    'dereference',
     'callback:2',
   ]);
 });
 
-Deno.test('static context rejects a null dereferenced pointer', () => {
+Deno.test('verification context rejects a null created pointer', () => {
   let callbackCalled = false;
   const symbols = coreSymbols({
-    secp256k1_context_static: {} as Deno.PointerValue,
+    secp256k1_context_create: () => null,
   }) as import('../src/native/symbols.ts').LoadedCoreSymbols;
   const helpers = createNativeContextHelpers(
     symbols,
-    contextRuntime([], null),
+    contextRuntime([]),
   );
 
   const error = assertThrows(
@@ -924,7 +933,7 @@ Deno.test('static context rejects a null dereferenced pointer', () => {
       }),
     NativeContextError,
   );
-  assertEquals(error.code, 'static-context-unavailable');
+  assertEquals(error.code, 'context-create-failed');
   assertEquals(callbackCalled, false);
 });
 
@@ -932,6 +941,7 @@ Deno.test('signing context uses NONE, randomizes, calls back, and destroys', () 
   const events: string[] = [];
   const mutableContext = {} as Deno.PointerValue;
   const symbols = coreSymbols({
+    secp256k1_selftest: () => events.push('selftest'),
     secp256k1_context_create: (flags) => {
       events.push(`create:${flags}`);
       return mutableContext;
@@ -949,7 +959,7 @@ Deno.test('signing context uses NONE, randomizes, calls back, and destroys', () 
   }) as import('../src/native/symbols.ts').LoadedCoreSymbols;
   const helpers = createNativeContextHelpers(
     symbols,
-    contextRuntime(events, null),
+    contextRuntime(events),
   );
 
   const result = helpers.withSigningContext((context) => {
@@ -960,6 +970,7 @@ Deno.test('signing context uses NONE, randomizes, calls back, and destroys', () 
 
   assertEquals(result, 42);
   assertEquals(events, [
+    'selftest',
     `create:${SECP256K1_CONTEXT_NONE}`,
     'random:32',
     'randomize:7',
@@ -979,7 +990,7 @@ Deno.test('signing context destroys after callback throws', () => {
   }) as import('../src/native/symbols.ts').LoadedCoreSymbols;
   const helpers = createNativeContextHelpers(
     symbols,
-    contextRuntime(events, null),
+    contextRuntime(events),
   );
 
   const thrown = assertThrows(() =>
@@ -1005,7 +1016,6 @@ Deno.test('signing context destroys without callback after RNG failure', () => {
     secp256k1_context_destroy: () => events.push('destroy'),
   }) as import('../src/native/symbols.ts').LoadedCoreSymbols;
   const runtime: NativeContextRuntime = {
-    dereferenceStatic: () => null,
     randomFill(): void {
       events.push('random');
       throw rngCause;
@@ -1032,7 +1042,7 @@ Deno.test('signing context destroys after randomize failure', () => {
   }) as import('../src/native/symbols.ts').LoadedCoreSymbols;
   const helpers = createNativeContextHelpers(
     symbols,
-    contextRuntime(events, null),
+    contextRuntime(events),
   );
 
   const error = assertThrows(
@@ -1055,7 +1065,7 @@ Deno.test('signing context rejects a null created pointer', () => {
   }) as import('../src/native/symbols.ts').LoadedCoreSymbols;
   const helpers = createNativeContextHelpers(
     symbols,
-    contextRuntime(events, null),
+    contextRuntime(events),
   );
 
   const error = assertThrows(
@@ -1066,7 +1076,7 @@ Deno.test('signing context rejects a null created pointer', () => {
   assertEquals(events, []);
 });
 
-Deno.test('real native initialization and contexts run only in a subprocess', async () => {
+function integrationLibraryPath(): string {
   const localMacLibrary = decodeURIComponent(
     new URL(
       '../secp256k1/build-deno/lib/libsecp256k1.6.dylib',
@@ -1077,10 +1087,35 @@ Deno.test('real native initialization and contexts run only in a subprocess', as
     ? localMacLibrary
     : Deno.env.get('DENO_SECP256K1_PATH');
   assert(path, 'DENO_SECP256K1_PATH must select the integration library');
+  return path;
+}
+
+async function runWithScopedFfi(
+  path: string,
+  script: string,
+): Promise<Deno.CommandOutput> {
+  const module = `data:application/typescript,${encodeURIComponent(script)}`;
+  return await new Deno.Command(Deno.execPath(), {
+    args: [
+      'run',
+      '--no-lock',
+      '--check',
+      '--no-prompt',
+      '--allow-env=DENO_SECP256K1_PATH',
+      `--allow-ffi=${path}`,
+      module,
+    ],
+    env: { DENO_SECP256K1_PATH: path },
+    stdout: 'piped',
+    stderr: 'piped',
+  }).output();
+}
+
+Deno.test('real native contexts work with path-scoped FFI', async () => {
+  const path = integrationLibraryPath();
   const moduleUrl = new URL('../src/native/mod.ts', import.meta.url).href;
   const contextUrl = new URL('../src/native/context.ts', import.meta.url).href;
   const loaderUrl = new URL('../src/native/loader.ts', import.meta.url).href;
-  const symbolsUrl = new URL('../src/native/symbols.ts', import.meta.url).href;
   const script = `
     import { initializeNative, nativeStatus } from ${JSON.stringify(moduleUrl)};
     import { withSigningContext, withStaticContext } from ${
@@ -1089,7 +1124,13 @@ Deno.test('real native initialization and contexts run only in a subprocess', as
     import { getNativeSymbols, requireCapability } from ${
     JSON.stringify(loaderUrl)
   };
-    import { dereferenceStaticPointer } from ${JSON.stringify(symbolsUrl)};
+    const path = Deno.env.get('DENO_SECP256K1_PATH');
+    if (path === undefined) throw new Error('missing native path');
+    const scoped = await Deno.permissions.query({ name: 'ffi', path });
+    const unscoped = await Deno.permissions.query({ name: 'ffi' });
+    if (scoped.state !== 'granted' || unscoped.state === 'granted') {
+      throw new Error('FFI permissions are not path-scoped');
+    }
     if (nativeStatus().state !== 'uninitialized') throw new Error('eager load');
     const status = initializeNative({
       require: ['extrakeys', 'schnorrsig', 'ellswift', 'musig'],
@@ -1098,7 +1139,7 @@ Deno.test('real native initialization and contexts run only in a subprocess', as
     const extrakeys = requireCapability('extrakeys');
     const schnorrsig = requireCapability('schnorrsig');
     const ellswift = requireCapability('ellswift');
-    const musig = requireCapability('musig');
+    requireCapability('musig');
     const requireOk = (result: number, operation: string): void => {
       if (result !== 1) throw new Error(operation + ' failed');
     };
@@ -1108,18 +1149,12 @@ Deno.test('real native initialization and contexts run only in a subprocess', as
       return output;
     };
     const seckeyA = scalar(7);
-    const seckeyB = scalar(8);
     const message = new Uint8Array(32).fill(9);
     const pubkeyA = new Uint8Array(64);
     const keypairA = new Uint8Array(96);
     const xonlyA = new Uint8Array(64);
     const signature = new Uint8Array(64);
     const ellA = new Uint8Array(64);
-    const ellB = new Uint8Array(64);
-    const bip324Hash = dereferenceStaticPointer(
-      ellswift.secp256k1_ellswift_xdh_hash_function_bip324,
-    );
-    if (bip324Hash === null) throw new Error('null BIP324 hash callback');
     withStaticContext((context) => {
       const tagged = new Uint8Array(32);
       const tag = new TextEncoder().encode('NativeTable');
@@ -1173,28 +1208,6 @@ Deno.test('real native initialization and contexts run only in a subprocess', as
         ),
         'ellswift create A',
       );
-      requireOk(
-        ellswift.secp256k1_ellswift_create(
-          context,
-          ellB,
-          seckeyB,
-          new Uint8Array(32).fill(11),
-        ),
-        'ellswift create B',
-      );
-      requireOk(
-        ellswift.secp256k1_ellswift_xdh(
-          context,
-          new Uint8Array(32),
-          ellA,
-          ellB,
-          seckeyA,
-          0,
-          bip324Hash,
-          null,
-        ),
-        'ellswift BIP324 xdh',
-      );
     });
     withStaticContext((context) => {
       requireOk(
@@ -1207,28 +1220,10 @@ Deno.test('real native initialization and contexts run only in a subprocess', as
         ),
         'schnorr verify',
       );
-      const pubkeyPointers = new BigUint64Array([
-        Deno.UnsafePointer.value(Deno.UnsafePointer.of(pubkeyA)),
-      ]);
-      requireOk(
-        musig.secp256k1_musig_pubkey_agg(
-          context,
-          new Uint8Array(64),
-          new Uint8Array(197),
-          new Uint8Array(pubkeyPointers.buffer),
-          1n,
-        ),
-        'musig pubkey aggregate',
-      );
     });
     console.log(JSON.stringify(status));
   `;
-  const output = await new Deno.Command(Deno.execPath(), {
-    args: ['eval', '--check', script],
-    env: { DENO_SECP256K1_PATH: path },
-    stdout: 'piped',
-    stderr: 'piped',
-  }).output();
+  const output = await runWithScopedFfi(path, script);
 
   assertEquals(
     output.code,
@@ -1245,4 +1240,64 @@ Deno.test('real native initialization and contexts run only in a subprocess', as
   for (const capability of Object.values(status.capabilities)) {
     assertEquals(capability.state, 'available');
   }
+});
+
+Deno.test('public verification API works with path-scoped FFI', async () => {
+  const path = integrationLibraryPath();
+  const moduleUrl = new URL('../src/mod.ts', import.meta.url).href;
+  const script = `
+    import {
+      Digest32,
+      EcdsaCompactSignature,
+      PublicKey,
+      SchnorrSignature,
+      verifyEcdsa,
+      verifyTaprootSignature,
+      XOnlyPublicKey,
+    } from ${JSON.stringify(moduleUrl)};
+    const path = Deno.env.get('DENO_SECP256K1_PATH');
+    if (path === undefined) throw new Error('missing native path');
+    const scoped = await Deno.permissions.query({ name: 'ffi', path });
+    const unscoped = await Deno.permissions.query({ name: 'ffi' });
+    if (scoped.state !== 'granted' || unscoped.state === 'granted') {
+      throw new Error('FFI permissions are not path-scoped');
+    }
+    const hex = (value: string): Uint8Array =>
+      Uint8Array.from(value.match(/../g) ?? [], (byte) => parseInt(byte, 16));
+
+    const ecdsaDigest = Digest32.fromBytes(hex(
+      'dade12e06a5bbf5e1116f9bc44998b876813e948e10707dcb48008a1daf3512d',
+    ));
+    const ecdsaPublicKey = PublicKey.parse(hex(
+      '0376ea9e36a75d2ecf9c93a0be76885e36f822529db22acfdc761c9b5b4544f5c5',
+    ));
+    const ecdsaSignature = EcdsaCompactSignature.fromBytes(hex(
+      'ab4c6d9ba51da83072615c33a9887b756478e6f9de381085f5183c97603fc6ff' +
+      '29722188bd937f54c861582ca6fc685b8da2b40d05f06b368374d35e4af2b764',
+    )).decode();
+    if (ecdsaSignature === null ||
+      !verifyEcdsa(ecdsaSignature, ecdsaDigest, ecdsaPublicKey)) {
+      throw new Error('ECDSA verification failed');
+    }
+
+    const schnorrPublicKey = XOnlyPublicKey.parse(hex(
+      'd69c3509bb99e412e68b0fe8544e72837dfa30746d8be2aa65975f29d22dc7b9',
+    ));
+    const schnorrDigest = Digest32.fromBytes(hex(
+      '4df3c3f68fcc83b27e9d42c90431a72499f17875c81a599b566c9889b9696703',
+    ));
+    const schnorrSignature = SchnorrSignature.fromBytes(hex(
+      '00000000000000000000003b78ce563f89a0ed9414f5aa28ad0d96d6795f9c63' +
+      '76afb1548af603b3eb45c9f8207dee1060cb71c04e80f593060b07d28308d7f4',
+    ));
+    if (!verifyTaprootSignature(
+      schnorrSignature,
+      schnorrDigest,
+      schnorrPublicKey,
+    )) {
+      throw new Error('BIP340 verification failed');
+    }
+  `;
+  const output = await runWithScopedFfi(path, script);
+  assertEquals(output.code, 0, new TextDecoder().decode(output.stderr));
 });

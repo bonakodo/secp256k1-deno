@@ -1,8 +1,8 @@
-/** Safe internal lifecycle helpers for static and secret-bearing contexts. */
+/** Safe internal lifecycle helpers for verification and signing contexts. */
 
 import { NativeContextError } from './errors.ts';
 import { getNativeSymbols } from './loader.ts';
-import { dereferenceStaticPointer, type LoadedCoreSymbols } from './symbols.ts';
+import type { LoadedCoreSymbols } from './symbols.ts';
 
 /** Required flag for mutable contexts in the supported libsecp256k1 ABI. */
 export const SECP256K1_CONTEXT_NONE = 1;
@@ -17,8 +17,6 @@ type SafeContextOperation<Operation extends NativeContextOperation> =
 
 /** Injectable unsafe operations and randomness used by context helpers. */
 export interface NativeContextRuntime {
-  /** Dereferences the address of an exported native context pointer. */
-  dereferenceStatic(address: Deno.PointerValue): Deno.PointerValue;
   /** Fills a context-randomization seed or throws. */
   randomFill(seed: Uint8Array): void;
 }
@@ -33,9 +31,6 @@ interface NativeContextHelpers {
 }
 
 const defaultContextRuntime: NativeContextRuntime = {
-  dereferenceStatic(address: Deno.PointerValue): Deno.PointerValue {
-    return dereferenceStaticPointer(address);
-  },
   randomFill(seed: Uint8Array): void {
     crypto.getRandomValues(seed);
   },
@@ -46,27 +41,17 @@ export function createNativeContextHelpers(
   symbols: LoadedCoreSymbols,
   runtime: NativeContextRuntime = defaultContextRuntime,
 ): NativeContextHelpers {
-  let staticContextSelfTested = false;
+  let selfTested = false;
+  let verificationContext: NativeContext | undefined;
 
-  function withStaticContext<Operation extends NativeContextOperation>(
-    operation: SafeContextOperation<Operation>,
-  ): ReturnType<Operation> {
-    if (!staticContextSelfTested) {
-      symbols.secp256k1_selftest();
-      staticContextSelfTested = true;
-    }
-    const context = runtime.dereferenceStatic(
-      symbols.secp256k1_context_static,
-    );
-    if (context === null) {
-      throw new NativeContextError('static-context-unavailable');
-    }
-    return operation(context) as ReturnType<Operation>;
+  function selfTestOnce(): void {
+    if (selfTested) return;
+    symbols.secp256k1_selftest();
+    selfTested = true;
   }
 
-  function withSigningContext<Operation extends NativeContextOperation>(
-    operation: SafeContextOperation<Operation>,
-  ): ReturnType<Operation> {
+  function createRandomizedContext(): NativeContext {
+    selfTestOnce();
     const context = symbols.secp256k1_context_create(
       SECP256K1_CONTEXT_NONE,
     );
@@ -74,12 +59,33 @@ export function createNativeContextHelpers(
       throw new NativeContextError('context-create-failed');
     }
 
+    const seed = new Uint8Array(32);
     try {
-      const seed = new Uint8Array(32);
       runtime.randomFill(seed);
       if (!symbols.secp256k1_context_randomize(context, seed)) {
         throw new NativeContextError('context-randomize-failed');
       }
+      return context;
+    } catch (cause) {
+      symbols.secp256k1_context_destroy(context);
+      throw cause;
+    } finally {
+      seed.fill(0);
+    }
+  }
+
+  function withStaticContext<Operation extends NativeContextOperation>(
+    operation: SafeContextOperation<Operation>,
+  ): ReturnType<Operation> {
+    verificationContext ??= createRandomizedContext();
+    return operation(verificationContext) as ReturnType<Operation>;
+  }
+
+  function withSigningContext<Operation extends NativeContextOperation>(
+    operation: SafeContextOperation<Operation>,
+  ): ReturnType<Operation> {
+    const context = createRandomizedContext();
+    try {
       return operation(context) as ReturnType<Operation>;
     } finally {
       symbols.secp256k1_context_destroy(context);
@@ -97,7 +103,8 @@ function contextHelpers(): NativeContextHelpers {
 }
 
 /**
- * Runs a synchronous internal operation with the self-tested static context.
+ * Runs a synchronous internal operation with the retained verification
+ * context. The callback must finish before this function returns.
  */
 export function withStaticContext<T>(
   operation: SafeContextOperation<(context: NativeContext) => T>,

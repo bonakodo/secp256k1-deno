@@ -391,7 +391,6 @@ export type NativeCapability =
 /** Exact symbols used to establish each independent native capability. */
 export const CAPABILITY_SYMBOLS = {
   core: [
-    'secp256k1_context_static',
     'secp256k1_selftest',
     'secp256k1_context_create',
     'secp256k1_context_destroy',
@@ -504,7 +503,9 @@ export type NativeStaticPointerReader = (
 /**
  * Dereferences an exported pointer static such as the static context or the
  * BIP324 EllSwift hash callback. `ForeignStatic` exposes the variable address,
- * not the pointer value stored in that variable.
+ * not the pointer value stored in that variable. This is intentionally absent
+ * from core API paths because Deno currently requires unscoped FFI permission
+ * for `UnsafePointerView` memory access.
  */
 export function dereferenceStaticPointer(
   address: Deno.PointerValue,
