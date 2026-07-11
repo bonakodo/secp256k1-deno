@@ -5,9 +5,9 @@
  * not implement BIP324's HKDF expansion, packet encryption, or transport
  * state machine. `DENO_SECP256K1_PATH` must name an absolute user-installed
  * libsecp256k1 path. Although other package operations support path-scoped
- * FFI permission, key derivation currently requires unscoped `--allow-ffi`
- * because Deno's `UnsafePointerView` is needed to dereference libsecp256k1's
- * exported BIP324 hash-callback pointer.
+ * FFI permission, key derivation requires unscoped `--allow-ffi` because
+ * Deno's `UnsafePointerView` is needed to validate libsecp256k1's exported
+ * BIP324 hash-callback pointer.
  *
  * @example Complete one initiator/responder key exchange.
  * ```ts
@@ -38,8 +38,7 @@
  */
 
 import { withSigningContext } from './native/context.ts';
-import { requireCapability } from './native/loader.ts';
-import { dereferenceStaticPointer } from './native/symbols.ts';
+import { requireEllSwift, requireEllSwiftSymbols } from './native/loader.ts';
 
 const ELLSWIFT_ENCODING_SIZE = 64;
 const SECRET_SIZE = 32;
@@ -403,8 +402,9 @@ export class Bip324KeyExchange implements Disposable {
    * @returns A disposable one-shot shared-secret handle.
    * @throws {Bip324InputError} If called from JavaScript with another value.
    * @throws {Bip324StateError} If this exchange was consumed or destroyed.
-   * @throws {Bip324NativeError} If callback lookup or native XDH fails.
-   * @throws {NativeCapabilityError} If libsecp256k1 lacks ElligatorSwift.
+   * @throws {Bip324NativeError} If callback permission or native XDH fails.
+   * @throws {NativeCapabilityError} If ElligatorSwift or its BIP324 hash
+   * callback is unavailable.
    * @throws Native configuration, loading, and context errors unchanged.
    * @since 1.0.0
    */
@@ -429,18 +429,16 @@ export class Bip324KeyExchange implements Disposable {
       const responderEncoding = this.#role === 'responder'
         ? localEncoding
         : peerEncoding;
-      const symbols = requireCapability('ellswift');
-      let hashCallback: Deno.PointerValue;
+      let capability: ReturnType<typeof requireEllSwift>;
       try {
-        hashCallback = dereferenceStaticPointer(
-          symbols.secp256k1_ellswift_xdh_hash_function_bip324,
-        );
+        capability = requireEllSwift();
       } catch (cause) {
-        throw new Bip324NativeError('hash-callback-unavailable', { cause });
+        if (cause instanceof Deno.errors.NotCapable) {
+          throw new Bip324NativeError('hash-callback-unavailable', { cause });
+        }
+        throw cause;
       }
-      if (hashCallback === null) {
-        throw new Bip324NativeError('hash-callback-unavailable');
-      }
+      const { symbols, bip324HashCallback } = capability;
 
       const succeeded = withSigningContext((context) =>
         symbols.secp256k1_ellswift_xdh(
@@ -450,7 +448,7 @@ export class Bip324KeyExchange implements Disposable {
           responderEncoding,
           secret,
           this.#role === 'initiator' ? 0 : 1,
-          hashCallback,
+          bip324HashCallback,
           null,
         ) === 1
       );
@@ -489,7 +487,7 @@ export class Bip324KeyExchange implements Disposable {
   }
 
   static #generate(role: Bip324Role): Bip324KeyExchange {
-    const symbols = requireCapability('ellswift');
+    const symbols = requireEllSwiftSymbols();
     const secret = new Uint8Array(SECRET_SIZE);
     const auxiliaryRandomness = new Uint8Array(SECRET_SIZE);
     const encoding = new Uint8Array(ELLSWIFT_ENCODING_SIZE);

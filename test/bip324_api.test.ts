@@ -6,8 +6,7 @@ import {
   EllSwiftEncoding,
 } from '../src/bip324.ts';
 import { withSigningContext } from '../src/native/context.ts';
-import { requireCapability } from '../src/native/loader.ts';
-import { dereferenceStaticPointer } from '../src/native/symbols.ts';
+import { requireEllSwift } from '../src/native/loader.ts';
 
 Deno.test('EllSwiftEncoding validates only length and copies bytes', () => {
   const input = new Uint8Array(64).fill(7);
@@ -164,11 +163,7 @@ Deno.test('native callback matches an upstream BIP324 XDH vector', () => {
     'c6992a117f5edbea70c3f511d32d26b9798be4b81a62eaee1a5acaa8459a3592',
   );
   const output = new Uint8Array(32);
-  const symbols = requireCapability('ellswift');
-  const callback = dereferenceStaticPointer(
-    symbols.secp256k1_ellswift_xdh_hash_function_bip324,
-  );
-  assert(callback !== null);
+  const { symbols, bip324HashCallback } = requireEllSwift();
 
   try {
     const succeeded = withSigningContext((context) =>
@@ -179,7 +174,7 @@ Deno.test('native callback matches an upstream BIP324 XDH vector', () => {
         responderEncoding,
         secretKey,
         0,
-        callback,
+        bip324HashCallback,
         null,
       ) === 1
     );

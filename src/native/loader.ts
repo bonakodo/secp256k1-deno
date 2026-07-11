@@ -11,6 +11,7 @@ import {
 } from './errors.ts';
 import {
   CAPABILITY_SYMBOLS,
+  dereferenceStaticPointer,
   type LoadedCapabilitySymbols,
   type LoadedCoreSymbols,
   type NativeCapability,
@@ -36,6 +37,18 @@ export interface NativeLoaderRuntime {
   readPath(): string | undefined;
   /** Opens one candidate with the all-optional descriptor table. */
   open(candidate: string): NativeLibraryHandle;
+  /** Reads the pointer stored in an exported native pointer static. */
+  readStaticPointer?(
+    address: NonNullable<Deno.PointerValue>,
+  ): Deno.PointerValue;
+}
+
+/** Internally validated ElligatorSwift symbols and BIP324 hash callback. */
+export interface LoadedEllSwiftCapability {
+  /** Complete ElligatorSwift symbol group from the retained native handle. */
+  readonly symbols: LoadedCapabilitySymbols<'ellswift'>;
+  /** Non-null BIP324 hash callback read from the exported pointer static. */
+  readonly bip324HashCallback: NonNullable<Deno.PointerValue>;
 }
 
 /**
@@ -99,6 +112,10 @@ export interface NativeLoader {
   requireCapability<C extends NativeCapability>(
     capability: C,
   ): LoadedCapabilitySymbols<C>;
+  /** Returns ElligatorSwift symbols only after validating its BIP324 callback. */
+  requireEllSwift(): LoadedEllSwiftCapability;
+  /** Returns ElligatorSwift symbols for operations that do not use BIP324 XDH. */
+  requireEllSwiftSymbols(): LoadedCapabilitySymbols<'ellswift'>;
 }
 
 type LoaderState =
@@ -137,6 +154,7 @@ export function classifyNativeCapabilities(
 /** Creates an isolated loader; production code uses the module singleton. */
 export function createNativeLoader(runtime: NativeLoaderRuntime): NativeLoader {
   let state: LoaderState = { kind: 'uninitialized' };
+  let ellSwiftHashCallback: NonNullable<Deno.PointerValue> | undefined;
 
   function status(): NativeStatus {
     if (state.kind === 'loaded') {
@@ -245,6 +263,18 @@ export function createNativeLoader(runtime: NativeLoaderRuntime): NativeLoader {
   function requireLoadedCapability<C extends NativeCapability>(
     capability: C,
   ): LoadedCapabilitySymbols<C> {
+    const symbols = requireSymbolCapability(capability);
+    if (capability === 'ellswift') {
+      requireEllSwiftCapability(
+        symbols as LoadedCapabilitySymbols<'ellswift'>,
+      );
+    }
+    return symbols;
+  }
+
+  function requireSymbolCapability<C extends NativeCapability>(
+    capability: C,
+  ): LoadedCapabilitySymbols<C> {
     if (state.kind !== 'loaded') initialize();
     if (state.kind !== 'loaded') throw new Error('unreachable loader state');
     const capabilityStatus = state.capabilities[capability];
@@ -258,11 +288,48 @@ export function createNativeLoader(runtime: NativeLoaderRuntime): NativeLoader {
     return state.handle.symbols as LoadedCapabilitySymbols<C>;
   }
 
+  function requireEllSwiftCapability(
+    loadedSymbols?: LoadedCapabilitySymbols<'ellswift'>,
+  ): LoadedEllSwiftCapability {
+    const symbols = loadedSymbols ?? requireSymbolCapability('ellswift');
+    if (ellSwiftHashCallback !== undefined) {
+      return { symbols, bip324HashCallback: ellSwiftHashCallback };
+    }
+
+    const address = symbols.secp256k1_ellswift_xdh_hash_function_bip324;
+    const hashCallback = runtime.readStaticPointer === undefined
+      ? dereferenceStaticPointer(address)
+      : runtime.readStaticPointer(address);
+    if (hashCallback === null) {
+      const loadedState = state as Extract<LoaderState, { kind: 'loaded' }>;
+      const missingSymbols = [
+        'secp256k1_ellswift_xdh_hash_function_bip324',
+      ] as const;
+      state = {
+        ...loadedState,
+        capabilities: {
+          ...loadedState.capabilities,
+          ellswift: { state: 'incompatible', missingSymbols },
+        },
+      };
+      throw new NativeCapabilityError(
+        'ellswift',
+        'incompatible',
+        missingSymbols,
+      );
+    }
+
+    ellSwiftHashCallback = hashCallback;
+    return { symbols, bip324HashCallback: hashCallback };
+  }
+
   return {
     initialize,
     status,
     getNativeSymbols,
     requireCapability: requireLoadedCapability,
+    requireEllSwift: requireEllSwiftCapability,
+    requireEllSwiftSymbols: () => requireSymbolCapability('ellswift'),
   };
 }
 
@@ -312,6 +379,9 @@ const isolateLoader = createNativeLoader({
   open(candidate: string): NativeLibraryHandle {
     return Deno.dlopen(candidate, nativeSymbolDefinitions);
   },
+  readStaticPointer(address): Deno.PointerValue {
+    return dereferenceStaticPointer(address);
+  },
 });
 
 /**
@@ -353,4 +423,14 @@ export function requireCapability<C extends NativeCapability>(
   capability: C,
 ): LoadedCapabilitySymbols<C> {
   return isolateLoader.requireCapability(capability);
+}
+
+/** Returns internally validated ElligatorSwift symbols and BIP324 callback. */
+export function requireEllSwift(): LoadedEllSwiftCapability {
+  return isolateLoader.requireEllSwift();
+}
+
+/** Returns ElligatorSwift symbols without reading the BIP324 callback static. */
+export function requireEllSwiftSymbols(): LoadedCapabilitySymbols<'ellswift'> {
+  return isolateLoader.requireEllSwiftSymbols();
 }

@@ -240,7 +240,13 @@ export class NativeCapabilityError extends Error {
     state: NativeCapabilityState,
     missingSymbols: readonly string[],
   ) {
-    super(`Native capability "${capability}" is ${state}`);
+    const detail = capability === 'ellswift' &&
+        missingSymbols.includes(
+          'secp256k1_ellswift_xdh_hash_function_bip324',
+        )
+      ? ': BIP324 hash callback is unavailable'
+      : '';
+    super(`Native capability "${capability}" is ${state}${detail}`);
     this.name = 'NativeCapabilityError';
     this.capability = capability;
     this.state = state;

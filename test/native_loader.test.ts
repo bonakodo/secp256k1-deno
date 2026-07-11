@@ -917,6 +917,96 @@ Deno.test('capability failures do not poison a loaded core', () => {
   assertEquals(handle.closeCount, 0);
 });
 
+Deno.test('ElligatorSwift caches callback incompatibility without poisoning core', () => {
+  const symbols = fakeSymbols(ALL_SYMBOL_NAMES);
+  const handle = fakeHandle(symbols);
+  let reads = 0;
+  const loader = createNativeLoader({
+    ...fakeRuntime('/absolute/libsecp256k1.so.6', () => handle),
+    readStaticPointer(address): Deno.PointerValue {
+      reads++;
+      assert(
+        address ===
+          symbols.secp256k1_ellswift_xdh_hash_function_bip324,
+      );
+      return null;
+    },
+  });
+
+  assertEquals(loader.initialize().capabilities.ellswift.state, 'available');
+  assertEquals(reads, 0);
+  const error = assertThrows(
+    () => loader.initialize({ require: ['ellswift'] }),
+    NativeCapabilityError,
+  );
+  assertEquals(error.capability, 'ellswift');
+  assertEquals(error.state, 'incompatible');
+  assertEquals(error.missingSymbols, [
+    'secp256k1_ellswift_xdh_hash_function_bip324',
+  ]);
+  assert(error.message.includes('BIP324 hash callback is unavailable'));
+  assertEquals(loader.status().capabilities.ellswift, {
+    state: 'incompatible',
+    missingSymbols: [
+      'secp256k1_ellswift_xdh_hash_function_bip324',
+    ],
+  });
+  assertThrows(() => loader.requireEllSwift(), NativeCapabilityError);
+  assertEquals(reads, 1);
+  assert(loader.requireCapability('core').secp256k1_selftest !== null);
+  assertEquals(loader.status().state, 'loaded');
+  assertEquals(handle.closeCount, 0);
+});
+
+Deno.test('ElligatorSwift caches a validated BIP324 callback', () => {
+  const symbols = fakeSymbols(ALL_SYMBOL_NAMES);
+  const callback = {} as NonNullable<Deno.PointerValue>;
+  let reads = 0;
+  const loader = createNativeLoader({
+    ...fakeRuntime(
+      '/absolute/libsecp256k1.so.6',
+      () => fakeHandle(symbols),
+    ),
+    readStaticPointer(): Deno.PointerValue {
+      reads++;
+      return callback;
+    },
+  });
+
+  loader.initialize({ require: ['ellswift'] });
+  assert(loader.requireEllSwift().bip324HashCallback === callback);
+  loader.requireCapability('ellswift');
+  assertEquals(loader.status().capabilities.ellswift.state, 'available');
+  assertEquals(reads, 1);
+});
+
+Deno.test('ElligatorSwift callback permission failures remain permission failures', () => {
+  const symbols = fakeSymbols(ALL_SYMBOL_NAMES);
+  const permissionError = new Deno.errors.NotCapable('FFI permission denied');
+  let reads = 0;
+  const loader = createNativeLoader({
+    ...fakeRuntime(
+      '/absolute/libsecp256k1.so.6',
+      () => fakeHandle(symbols),
+    ),
+    readStaticPointer(): Deno.PointerValue {
+      reads++;
+      throw permissionError;
+    },
+  });
+
+  let caught: unknown;
+  try {
+    loader.initialize({ require: ['ellswift'] });
+  } catch (cause) {
+    caught = cause;
+  }
+  assert(caught === permissionError);
+  assertEquals(loader.status().capabilities.ellswift.state, 'available');
+  assertEquals(loader.status().state, 'loaded');
+  assertEquals(reads, 1);
+});
+
 function coreSymbols(
   overrides: Partial<NativeSymbols> = {},
 ): NativeSymbols {
@@ -1187,9 +1277,11 @@ Deno.test('real native contexts work with path-scoped FFI', async () => {
     import { withSigningContext, withStaticContext } from ${
     JSON.stringify(contextUrl)
   };
-    import { getNativeSymbols, requireCapability } from ${
-    JSON.stringify(loaderUrl)
-  };
+    import {
+      getNativeSymbols,
+      requireCapability,
+      requireEllSwiftSymbols,
+    } from ${JSON.stringify(loaderUrl)};
     const path = Deno.env.get('DENO_SECP256K1_PATH');
     if (path === undefined) throw new Error('missing native path');
     const scoped = await Deno.permissions.query({ name: 'ffi', path });
@@ -1199,12 +1291,18 @@ Deno.test('real native contexts work with path-scoped FFI', async () => {
     }
     if (nativeStatus().state !== 'uninitialized') throw new Error('eager load');
     const status = initializeNative({
-      require: ['extrakeys', 'schnorrsig', 'ellswift', 'musig'],
+      require: ['extrakeys', 'schnorrsig', 'musig'],
     });
     const core = getNativeSymbols();
     const extrakeys = requireCapability('extrakeys');
     const schnorrsig = requireCapability('schnorrsig');
-    const ellswift = requireCapability('ellswift');
+    try {
+      requireCapability('ellswift');
+      throw new Error('ElligatorSwift callback validation unexpectedly passed');
+    } catch (error) {
+      if (!(error instanceof Deno.errors.NotCapable)) throw error;
+    }
+    const ellswift = requireEllSwiftSymbols();
     requireCapability('musig');
     const requireOk = (result: number, operation: string): void => {
       if (result !== 1) throw new Error(operation + ' failed');
