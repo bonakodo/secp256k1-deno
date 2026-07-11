@@ -16,7 +16,7 @@
  * @example Parse an untrusted public nonce
  * ```ts
  * #!/usr/bin/env -S deno run --allow-env=DENO_SECP256K1_PATH --allow-ffi
- * import { MuSigPublicNonce } from "./musig2.ts";
+ * import { MuSigPublicNonce } from "jsr:@bonakodo/secp256k1@1/musig2";
  *
  * const peerBytes = new Uint8Array(66);
  * const nonce = MuSigPublicNonce.tryFromBytes(peerBytes);
@@ -27,6 +27,7 @@
  * @see https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki
  * @see https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki
  * @module
+ * @since 1.0.0
  */
 
 import { Digest32 } from './api/digest.ts';
@@ -65,7 +66,15 @@ const SESSION_SIZE = 133;
 const PARTIAL_SIGNATURE_SIZE = 36;
 const EC_COMPRESSED = 258;
 
-/** Stable state-error codes for MuSig2 programmer misuse. @since 1.0.0 */
+/**
+
+ * Stable state-error codes for MuSig2 programmer misuse.
+
+ *
+
+ * @since 1.0.0
+
+ */
 export type MuSigStateErrorCode =
   | 'empty-participants'
   | 'invalid-participant-index'
@@ -88,7 +97,11 @@ export type MuSigStateErrorCode =
  * @since 1.0.0
  */
 export class MuSigStateError extends Error {
-  /** Machine-readable misuse category. @since 1.0.0 */
+  /**
+   * Machine-readable misuse category.
+   *
+   * @since 1.0.0
+   */
   readonly code: MuSigStateErrorCode;
 
   /**
@@ -116,7 +129,11 @@ export class MuSigStateError extends Error {
  * @since 1.0.0
  */
 export class MuSigNativeError extends Error {
-  /** Native operation that failed. @since 1.0.0 */
+  /**
+   * Native operation that failed.
+   *
+   * @since 1.0.0
+   */
   readonly operation: string;
 
   /**
@@ -186,71 +203,207 @@ export interface MuSigTapMerkleRoot {
   toBytes(): Uint8Array;
 }
 
-/** A public nonce associated with one ordered participant. @since 1.0.0 */
+/**
+
+ * A public nonce associated with one ordered participant.
+
+ *
+
+ * @since 1.0.0
+
+ */
 export interface IndexedMuSigPublicNonce {
-  /** Stable zero-based index in the ordered key aggregation. @since 1.0.0 */
+  /**
+   * Stable zero-based index in the ordered key aggregation.
+   *
+   * @since 1.0.0
+   */
   readonly participantIndex: number;
-  /** Participant's validated public nonce. @since 1.0.0 */
+  /**
+   * Participant's validated public nonce.
+   *
+   * @since 1.0.0
+   */
   readonly publicNonce: MuSigPublicNonce;
 }
 
-/** A partial signature associated with one ordered participant. @since 1.0.0 */
+/**
+
+ * A partial signature associated with one ordered participant.
+
+ *
+
+ * @since 1.0.0
+
+ */
 export interface IndexedMuSigPartialSignature {
-  /** Stable zero-based index in the ordered key aggregation. @since 1.0.0 */
+  /**
+   * Stable zero-based index in the ordered key aggregation.
+   *
+   * @since 1.0.0
+   */
   readonly participantIndex: number;
-  /** Participant's validated partial signature. @since 1.0.0 */
+  /**
+   * Participant's validated partial signature.
+   *
+   * @since 1.0.0
+   */
   readonly partialSignature: MuSigPartialSignature;
 }
 
-/** Input used to verify a participant's exact nonce and partial binding. @since 1.0.0 */
+/**
+
+ * Input used to verify a participant's exact nonce and partial binding.
+
+ *
+
+ * @since 1.0.0
+
+ */
 export interface MuSigPartialVerification {
-  /** Stable zero-based participant index. @since 1.0.0 */
+  /**
+   * Stable zero-based participant index.
+   *
+   * @since 1.0.0
+   */
   readonly participantIndex: number;
-  /** Public nonce supplied for this participant and session. @since 1.0.0 */
+  /**
+   * Public nonce supplied for this participant and session.
+   *
+   * @since 1.0.0
+   */
   readonly publicNonce: MuSigPublicNonce;
-  /** Candidate partial signature. @since 1.0.0 */
+  /**
+   * Candidate partial signature.
+   *
+   * @since 1.0.0
+   */
   readonly partialSignature: MuSigPartialSignature;
 }
 
-/** Result of applying the single BIP341 tweak to a key aggregation. @since 1.0.0 */
+/**
+
+ * Result of applying the single BIP341 tweak to a key aggregation.
+
+ *
+
+ * @since 1.0.0
+
+ */
 export interface MuSigTaprootTweakResult {
-  /** New aggregation context containing the tweaked native cache. @since 1.0.0 */
+  /**
+   * New aggregation context containing the tweaked native cache.
+   *
+   * @since 1.0.0
+   */
   readonly keyAggregation: MuSigKeyAggregation;
-  /** Tweaked Taproot output key. @since 1.0.0 */
+  /**
+   * Tweaked Taproot output key.
+   *
+   * @since 1.0.0
+   */
   readonly outputKey: XOnlyPublicKey;
-  /** Y parity of the full tweaked output point. @since 1.0.0 */
+  /**
+   * Y parity of the full tweaked output point.
+   *
+   * @since 1.0.0
+   */
   readonly outputKeyParity: 0 | 1;
 }
 
-/** Arguments used to generate a single-use secret nonce. @since 1.0.0 */
+/**
+
+ * Arguments used to generate a single-use secret nonce.
+
+ *
+
+ * @since 1.0.0
+
+ */
 export interface MuSigSecretNonceGeneration {
-  /** Stable zero-based participant index. @since 1.0.0 */
+  /**
+   * Stable zero-based participant index.
+   *
+   * @since 1.0.0
+   */
   readonly participantIndex: number;
-  /** Secret key matching that exact participant entry. @since 1.0.0 */
+  /**
+   * Secret key matching that exact participant entry.
+   *
+   * @since 1.0.0
+   */
   readonly secretKey: MuSigSigningKey;
-  /** Bitcoin transaction digest to bind into nonce derivation. @since 1.0.0 */
+  /**
+   * Bitcoin transaction digest to bind into nonce derivation.
+   *
+   * @since 1.0.0
+   */
   readonly digest: Digest32;
-  /** Ordered, optionally Taproot-tweaked key aggregation. @since 1.0.0 */
+  /**
+   * Ordered, optionally Taproot-tweaked key aggregation.
+   *
+   * @since 1.0.0
+   */
   readonly keyAggregation: MuSigKeyAggregation;
 }
 
-/** Arguments used to create a signing session. @since 1.0.0 */
+/**
+
+ * Arguments used to create a signing session.
+
+ *
+
+ * @since 1.0.0
+
+ */
 export interface MuSigSessionCreation {
-  /** Aggregate nonce received or produced for this round. @since 1.0.0 */
+  /**
+   * Aggregate nonce received or produced for this round.
+   *
+   * @since 1.0.0
+   */
   readonly aggregateNonce: MuSigAggregateNonce;
-  /** Exactly one indexed public nonce per participant. @since 1.0.0 */
+  /**
+   * Exactly one indexed public nonce per participant.
+   *
+   * @since 1.0.0
+   */
   readonly publicNonces: readonly IndexedMuSigPublicNonce[];
-  /** Bitcoin transaction digest being signed. @since 1.0.0 */
+  /**
+   * Bitcoin transaction digest being signed.
+   *
+   * @since 1.0.0
+   */
   readonly digest: Digest32;
-  /** The exact key aggregation used during nonce generation. @since 1.0.0 */
+  /**
+   * The exact key aggregation used during nonce generation.
+   *
+   * @since 1.0.0
+   */
   readonly keyAggregation: MuSigKeyAggregation;
 }
 
-/** Arguments used for one local partial-signing attempt. @since 1.0.0 */
+/**
+
+ * Arguments used for one local partial-signing attempt.
+
+ *
+
+ * @since 1.0.0
+
+ */
 export interface MuSigPartialSigning {
-  /** Opaque single-use nonce generated for this session data. @since 1.0.0 */
+  /**
+   * Opaque single-use nonce generated for this session data.
+   *
+   * @since 1.0.0
+   */
   readonly secretNonce: MuSigSecretNonce;
-  /** Secret key matching the nonce's indexed participant. @since 1.0.0 */
+  /**
+   * Secret key matching the nonce's indexed participant.
+   *
+   * @since 1.0.0
+   */
   readonly secretKey: MuSigSigningKey;
 }
 
@@ -560,7 +713,15 @@ export class MuSigKeyAggregation {
     });
   }
 
-  /** Number of ordered participant entries, including duplicates. @since 1.0.0 */
+  /**
+
+   * Number of ordered participant entries, including duplicates.
+
+   *
+
+   * @since 1.0.0
+
+   */
   get participantCount(): number {
     return keyAggregationState(this).participants.length;
   }
@@ -854,7 +1015,15 @@ export class MuSigSecretNonce {
     }
   }
 
-  /** Stable zero-based participant index bound during generation. @since 1.0.0 */
+  /**
+
+   * Stable zero-based participant index bound during generation.
+
+   *
+
+   * @since 1.0.0
+
+   */
   get participantIndex(): number {
     return secretNonceState(this).participantIndex;
   }
@@ -871,7 +1040,15 @@ export class MuSigSecretNonce {
     );
   }
 
-  /** Whether a signing attempt has permanently consumed this handle. @since 1.0.0 */
+  /**
+
+   * Whether a signing attempt has permanently consumed this handle.
+
+   *
+
+   * @since 1.0.0
+
+   */
   get consumed(): boolean {
     return secretNonceState(this).consumed;
   }

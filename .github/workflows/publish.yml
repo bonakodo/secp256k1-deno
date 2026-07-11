@@ -17,7 +17,9 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
-      - uses: denoland/setup-deno@main
+      - uses: denoland/setup-deno@v2
         with:
-          deno-version: 'v2.x'
+          deno-version: latest
+      - name: Validate package
+        run: deno publish --dry-run
       - run: deno publish

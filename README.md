@@ -1,137 +1,189 @@
-# secp256k1-deno
+# secp256k1 for Deno
 
-Native bindings to [bitcoin-core/secp256k1](https://github.com/bitcoin-core/secp256k1) for Deno using [Foreign Function Interface (FFI) API](https://docs.deno.com/runtime/reference/deno_namespace_apis/#ffi).
+Bitcoin-focused, safe-by-default Deno bindings to the native
+[`bitcoin-core/secp256k1`](https://github.com/bitcoin-core/secp256k1) library.
+The typed API covers ECDSA and Taproot verification, signing, BIP341 tweaks,
+historical lax-DER verification, BIP324 key exchange, and MuSig2.
 
-This module has no third-party Deno dependencies except for testing.
+This package supports Deno only. It does not download, build, or bundle native
+binaries.
 
 ## Install libsecp256k1
 
-This module requires the `libsecp256k1` native library. Install it via your package manager or build it from source.
+Install libsecp256k1 yourself through your operating system or build the
+vendored upstream source. Version 1.0 targets libsecp256k1 ABI 6. Optional APIs
+also require their upstream modules:
 
-### Install via Package Manager
+| Package API                               | Native module                      |
+| ----------------------------------------- | ---------------------------------- |
+| ECDSA verification/signing and key tweaks | core                               |
+| Taproot and x-only keys                   | `extrakeys`, `schnorrsig`          |
+| BIP324                                    | `ellswift`                         |
+| MuSig2                                    | `musig`, `extrakeys`, `schnorrsig` |
 
-- **Ubuntu/Debian**:
+For example, Homebrew provides ABI 6 on supported macOS releases:
 
-```bash
-sudo apt-get install libsecp256k1-0
-```
-
-- **Alpine Linux**:
-
-```bash
-sudo apk add libsecp256k1
-```
-
-- **MacOS**:
-
-```bash
+```sh
 brew install secp256k1
 ```
 
-**Note:** Some Linux distributions may provide `libsecp256k1` without certain modules (e.g., `--enable-module-schnorrsig`). In such cases, you need to build the library from source with the required modules enabled.
+To build every supported module from the checked-out upstream source:
 
-### Build from source
-
-Follow the [build steps](https://github.com/bitcoin-core/secp256k1?tab=readme-ov-file#building-with-autotools) in the bitcoin-core/secp256k1 repository. Ensure you enable the necessary modules:
-
-```bash
-./autogen.sh
-./configure --enable-module-schnorrsig
-make
-sudo make install
+```sh
+cmake -S secp256k1 -B secp256k1/build \
+  -DBUILD_SHARED_LIBS=ON \
+  -DSECP256K1_ENABLE_MODULE_RECOVERY=ON \
+  -DSECP256K1_ENABLE_MODULE_ECDH=ON \
+  -DSECP256K1_ENABLE_MODULE_EXTRAKEYS=ON \
+  -DSECP256K1_ENABLE_MODULE_SCHNORRSIG=ON \
+  -DSECP256K1_ENABLE_MODULE_ELLSWIFT=ON \
+  -DSECP256K1_ENABLE_MODULE_MUSIG=ON
+cmake --build secp256k1/build --parallel
 ```
 
-### Configure Library Path
+## Native configuration
 
-By default, the module searches for the library file:
+`DENO_SECP256K1_PATH` is mandatory for the version 1 API. Its value must be
+either an absolute path or exactly `auto`. Unset, empty, relative, and
+whitespace-padded values fail closed.
 
-- **Windows**: `secp256k1.dll`
-- **Linux**: `libsecp256k1.so`
-- **macOS**: `libsecp256k1.dylib`
+For production nodes, select one absolute path. No fallback is attempted:
 
-If the library is not in your system’s dynamic library load path, specify the full path using the `DENO_SECP256K1_PATH` environment variable:
-
-```bash
-# For example, on MacOS using Homebrew
-export DENO_SECP256K1_PATH=/opt/homebrew/lib/libsecp256k1.dylib
+```sh
+export DENO_SECP256K1_PATH=/usr/lib/x86_64-linux-gnu/libsecp256k1.so.6
+deno run \
+  --allow-env=DENO_SECP256K1_PATH \
+  --allow-ffi="$DENO_SECP256K1_PATH" \
+  node.ts
 ```
 
-## Required Permissions
+Root verification, signing, Taproot, historical verification, and key-tweak
+operations support path-scoped FFI permission. BIP324 and MuSig2 currently use
+Deno pointer APIs that require unscoped `--allow-ffi`:
 
-This module requires the following Deno flags:
-
-- `--allow-ffi`
-- `--allow-env=DENO_SECP256K1_PATH`
-
-To run the examples below, use:
-
-```bash
-deno run --allow-ffi --allow-env=DENO_SECP256K1_PATH example.ts
+```sh
+deno run --allow-env=DENO_SECP256K1_PATH --allow-ffi node.ts
 ```
 
-## ECDSA Signing and Verification
+`DENO_SECP256K1_PATH=auto` delegates lookup to the operating-system loader and
+also requires unscoped `--allow-ffi`. Auto mode tries only ABI-6 names:
 
-```typescript
-// example.ts
+- Linux x86_64/aarch64: `libsecp256k1.so.6`
+- macOS x86_64/aarch64: `libsecp256k1.6.dylib`, then the matching Homebrew
+  location (`/usr/local/lib` or `/opt/homebrew/lib`)
+- Windows: unsupported; provide an absolute DLL path
 
-// Import the module
-import * as secp256k1 from 'jsr:@bonakodo/secp256k1';
+Auto mode trusts every candidate location searched by the platform loader.
+Native FFI code executes outside Deno's sandbox, and an absolute path can still
+refer to a symlink or load transitive dependencies. Pin and protect the native
+library and its dependencies as part of your node's deployment.
 
-// Prepare a message hash
-const message = 'Hello, Deno!';
-const encoder = new TextEncoder();
-const messageBytes = encoder.encode(message);
-const messageHash = new Uint8Array(
-  await crypto.subtle.digest('SHA-256', messageBytes),
-);
+## Verification
 
-// Generate a secret key
-let secretKey = new Uint8Array(32);
-do {
-  crypto.getRandomValues(secretKey);
-} while (!secp256k1.secretKeyVerify(secretKey));
+Use non-throwing parsers for peer-controlled bytes. Native configuration and
+runtime failures still throw, so infrastructure failure is never mistaken for
+an invalid transaction or signature.
 
-// Sign the message
-const signature = secp256k1.ecdsaSign(messageHash, secretKey);
+```ts
+import {
+  Digest32,
+  EcdsaDerSignature,
+  PublicKey,
+  verifyEcdsaDer,
+} from 'jsr:@bonakodo/secp256k1@1';
 
-// Get the public key in compressed format
-const publicKey = secp256k1.publicKeyCreate(secretKey);
+const digest = Digest32.tryFromBytes(transactionDigest);
+const signature = EcdsaDerSignature.tryFromBytes(derWithoutSighashByte);
+const publicKey = PublicKey.tryParse(serializedPublicKey);
 
-// Verify the signature
-const isValid = secp256k1.ecdsaVerify(signature, messageHash, publicKey);
-console.log(isValid); // true
+const valid = digest !== null && signature !== null && publicKey !== null &&
+  verifyEcdsaDer(signature, digest, publicKey);
 ```
 
-## Schnorr Signatures
+The package accepts already computed 32-byte Bitcoin signature digests. Script
+execution, transaction serialization, sighash selection, and policy checks
+remain the node's responsibility.
 
-```typescript
-// example.ts
-import * as secp256k1 from 'jsr:@bonakodo/secp256k1';
+## Signing and Taproot
 
-// Prepare a tagged message hash
-const message = 'Hello, Deno!';
-const tag = 'BIP0340/challenge';
-const messageHash = secp256k1.taggedSha256(message, tag);
+```ts
+import { Digest32, verifyTaprootSignature } from 'jsr:@bonakodo/secp256k1@1';
+import {
+  SecretKey,
+  signTaprootSignature,
+} from 'jsr:@bonakodo/secp256k1@1/signing';
 
-// Generate a secret key
-let secretKey = new Uint8Array(32);
-do {
-  crypto.getRandomValues(secretKey);
-} while (!secp256k1.secretKeyVerify(secretKey));
-
-// Sign the message using Schnorr signatures
-const signature = secp256k1.schnorrSign(messageHash, secretKey);
-
-// Get the public key in x-only format
-const publicKey = secp256k1.createXOnlyPublicKey(secretKey);
-
-// Verify the signature
-const isValid = secp256k1.schnorrVerify(signature, messageHash, publicKey);
-console.log(isValid); // true
+using secretKey = SecretKey.generate();
+const digest = Digest32.fromBytes(taprootSighash);
+const signature = signTaprootSignature(digest, secretKey);
+const { key: outputKey } = secretKey.xOnlyPublicKey();
+console.assert(verifyTaprootSignature(signature, digest, outputKey));
 ```
+
+`SecretKey`, BIP324 shared secrets, and protocol nonce handles are disposable
+stateful values. Destruction overwrites package-owned buffers on a best-effort
+basis. JavaScript cannot erase bytes already exported or copied by application
+code, the runtime, or native dependencies.
+
+## Entrypoints
+
+| Import                            | Purpose                                                        |
+| --------------------------------- | -------------------------------------------------------------- |
+| `@bonakodo/secp256k1`             | Safe ECDSA and Taproot verification plus native initialization |
+| `@bonakodo/secp256k1/signing`     | Disposable secret keys and Bitcoin signing                     |
+| `@bonakodo/secp256k1/taproot`     | BIP341 public and secret key tweaking                          |
+| `@bonakodo/secp256k1/historical`  | Bitcoin Core-compatible pre-BIP66 lax-DER verification         |
+| `@bonakodo/secp256k1/key-tweaks`  | Additive key tweaks for BIP32-like derivation                  |
+| `@bonakodo/secp256k1/diagnostics` | Lazy native initialization and capability status               |
+| `@bonakodo/secp256k1/bip324`      | Role-bound ElligatorSwift shared-secret derivation             |
+| `@bonakodo/secp256k1/musig2`      | Indexed, nonce-safe BIP327 signing                             |
+| `@bonakodo/secp256k1/legacy`      | Version 0.5.3 compatibility surface                            |
+
+`historical` exposes one cryptographic compatibility primitive. It is not a
+Bitcoin consensus engine and does not decide activation heights, script flags,
+sighash types, or transaction validity.
+
+Runnable end-to-end samples are in [`examples/`](./examples/).
+
+## Tested platforms
+
+CI builds the vendored all-module library and runs both Deno 2.0.0 and current
+stable on Linux x86_64/aarch64, macOS x86_64/aarch64, and Windows x86_64.
+GitHub's `macos-15-intel` line is the final standard hosted Intel macOS runner;
+Windows Arm64 is not in the declared support matrix. Windows supports explicit
+DLL paths only.
+
+## Migration from 0.5.3
+
+Version 1 moves byte validation and secret ownership into explicit types:
+
+| 0.5.3 function                   | Version 1 API                                                        |
+| -------------------------------- | -------------------------------------------------------------------- |
+| `secretKeyVerify(bytes)`         | `SecretKey.fromBytes(bytes)`                                         |
+| `publicKeyVerify(bytes)`         | `PublicKey.tryParse(bytes) !== null`                                 |
+| `publicKeyCreate(secret)`        | `SecretKey.fromBytes(secret).publicKey()`                            |
+| `ecdsaSign(hash, secret)`        | `signEcdsa(Digest32.fromBytes(hash), key)`                           |
+| `ecdsaVerify(sig, hash, pubkey)` | `verifyEcdsa(EcdsaSignature, Digest32, PublicKey)`                   |
+| `signatureImport(der)`           | `EcdsaDerSignature.fromBytes(der).decode()`                          |
+| `signatureExport(sig)`           | `EcdsaSignature.toDer()`                                             |
+| `schnorrSign(hash, secret)`      | `signTaprootSignature(Digest32, SecretKey)`                          |
+| `schnorrVerify(sig, hash, key)`  | `verifyTaprootSignature(SchnorrSignature, Digest32, XOnlyPublicKey)` |
+| `publicKeyTweakAdd`              | `addTweakToPublicKey(PublicKey, Tweak32)`                            |
+| `secretKeyTweakAdd`              | `addTweakToSecretKey(SecretKey, Tweak32)`                            |
+
+The `legacy` entrypoint preserves the old mutable-buffer and loading behavior
+for migration. New node code should use the version 1 entrypoints and mandatory
+configuration above.
+
+## Release checklist
+
+Before publishing, confirm the JSR package settings that are not source
+configuration:
+
+- Description and GitHub repository link are current.
+- Deno is the only marked compatible runtime.
+- GitHub Actions publishing remains linked for OIDC provenance.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
-
-© 2024 Bonakodo Limited
+MIT. See [`LICENSE`](./LICENSE).

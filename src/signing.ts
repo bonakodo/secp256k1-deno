@@ -7,6 +7,7 @@
  * {@link SecretKey.exportBytes}.
  *
  * @module
+ * @since 1.0.0
  */
 
 import type { Digest32 } from './api/digest.ts';
@@ -27,7 +28,11 @@ const KEYPAIR_SIZE = 96;
 const X_ONLY_PUBLIC_KEY_SIZE = 64;
 const EC_COMPRESSED = 258;
 
-/** Thrown when an operation attempts to use a destroyed secret key. */
+/**
+ * Thrown when an operation attempts to use a destroyed secret key.
+ *
+ * @since 1.0.0
+ */
 export class SecretKeyDestroyedError extends Error {
   /**
    * Creates a secret-key lifecycle error.
@@ -50,7 +55,7 @@ export class SecretKeyDestroyedError extends Error {
  * @example Generate and dispose a key
  * ```ts
  * #!/usr/bin/env -S deno run --allow-env=DENO_SECP256K1_PATH --allow-ffi
- * import { SecretKey } from "./signing.ts";
+ * import { SecretKey } from "jsr:@bonakodo/secp256k1@1/signing";
  *
  * using secretKey = SecretKey.generate();
  * const publicKey = secretKey.publicKey();

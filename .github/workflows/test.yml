@@ -7,27 +7,40 @@ on:
     branches: [master]
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  native:
+    name: Deno ${{ matrix.deno }} / ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        deno: ['2.0.0', 'latest']
+        # These are standard hosted runners. macos-15-intel is the last
+        # standard Intel macOS line; Windows Arm64 is not generally available.
+        runner:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+          - macos-15-intel
+          - macos-15
+          - windows-2025
+
     steps:
-      - name: Setup repo
+      - name: Check out repository
         uses: actions/checkout@v4
         with:
           submodules: true
 
-      - name: Setup Deno
-        uses: denoland/setup-deno@main
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
         with:
-          deno-version: 'v2.x'
+          deno-version: ${{ matrix.deno }}
 
-      - name: Check Formatting
-        run: deno fmt --check --config deno.jsonc
-
-      - name: Lint
-        run: deno lint --config deno.jsonc
-
-      - name: Build libsecp256k1
+      - name: Configure libsecp256k1
+        if: runner.os != 'Windows'
+        shell: bash
         run: |
           cmake -S secp256k1 -B secp256k1/build-deno \
             -DBUILD_SHARED_LIBS=ON \
@@ -42,9 +55,162 @@ jobs:
             -DSECP256K1_BUILD_EXHAUSTIVE_TESTS=OFF \
             -DSECP256K1_BUILD_CTIME_TESTS=OFF \
             -DSECP256K1_BUILD_EXAMPLES=OFF
-          cmake --build secp256k1/build-deno -j
 
-      - name: Run Tests
-        env:
-          DENO_SECP256K1_PATH: secp256k1/build-deno/lib/libsecp256k1.so
-        run: deno test --allow-env=DENO_SECP256K1_PATH --allow-ffi --allow-read=secp256k1
+      - name: Configure libsecp256k1 on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake -S secp256k1 -B secp256k1/build-deno `
+            -DBUILD_SHARED_LIBS=ON `
+            -DSECP256K1_ENABLE_MODULE_RECOVERY=ON `
+            -DSECP256K1_ENABLE_MODULE_ECDH=ON `
+            -DSECP256K1_ENABLE_MODULE_EXTRAKEYS=ON `
+            -DSECP256K1_ENABLE_MODULE_SCHNORRSIG=ON `
+            -DSECP256K1_ENABLE_MODULE_ELLSWIFT=ON `
+            -DSECP256K1_ENABLE_MODULE_MUSIG=ON `
+            -DSECP256K1_BUILD_BENCHMARK=OFF `
+            -DSECP256K1_BUILD_TESTS=OFF `
+            -DSECP256K1_BUILD_EXHAUSTIVE_TESTS=OFF `
+            -DSECP256K1_BUILD_CTIME_TESTS=OFF `
+            -DSECP256K1_BUILD_EXAMPLES=OFF
+
+      - name: Build libsecp256k1 on Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cmake --build secp256k1/build-deno --parallel
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            pattern='libsecp256k1.so.6*'
+          else
+            pattern='libsecp256k1.6.dylib'
+          fi
+          candidate="$(find "$PWD/secp256k1/build-deno" -name "$pattern" -print -quit)"
+          test -n "$candidate"
+          library="$(realpath "$candidate")"
+          test -f "$library"
+          echo "DENO_SECP256K1_PATH=$library" >> "$GITHUB_ENV"
+          echo "LIBSECP_DIR=$(dirname "$library")" >> "$GITHUB_ENV"
+
+      - name: Build libsecp256k1 on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake --build secp256k1/build-deno --config Release --parallel
+          $library = Get-ChildItem secp256k1/build-deno -Recurse -File |
+            Where-Object { $_.Name -match '^(lib)?secp256k1-6\.dll$' } |
+            Select-Object -First 1
+          if ($null -eq $library) {
+            throw 'ABI-6 secp256k1 DLL was not produced'
+          }
+          $path = $library.FullName
+          "DENO_SECP256K1_PATH=$path" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "LIBSECP_DIR=$($library.DirectoryName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Verify path-scoped root API
+        run: >-
+          deno run --no-lock --no-prompt
+          --import-map=doc.import-map.json
+          --allow-env=DENO_SECP256K1_PATH
+          --allow-ffi="${{ env.DENO_SECP256K1_PATH }}"
+          examples/verify.ts
+
+      - name: Verify explicit-path API and test suite
+        run: >-
+          deno test --no-lock --no-prompt
+          --allow-env=DENO_SECP256K1_PATH
+          --allow-ffi
+          --allow-read=.
+          --allow-run
+
+      - name: Verify auto loader on Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          DENO_SECP256K1_PATH=auto LD_LIBRARY_PATH="$LIBSECP_DIR" \
+            deno eval --no-lock \
+              --allow-env=DENO_SECP256K1_PATH --allow-ffi \
+              'import { initializeNative } from "./src/native/mod.ts";
+               if (initializeNative().state !== "loaded") throw new Error("auto load failed");'
+
+      - name: Verify auto loader on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          DENO_SECP256K1_PATH=auto DYLD_LIBRARY_PATH="$LIBSECP_DIR" \
+            deno eval --no-lock \
+              --allow-env=DENO_SECP256K1_PATH --allow-ffi \
+              'import { initializeNative } from "./src/native/mod.ts";
+               if (initializeNative().state !== "loaded") throw new Error("auto load failed");'
+
+      - name: Check formatting
+        if: matrix.deno == 'latest' && matrix.runner == 'ubuntu-24.04'
+        run: deno fmt --check --config deno.jsonc
+
+      - name: Lint source
+        if: matrix.deno == 'latest' && matrix.runner == 'ubuntu-24.04'
+        run: deno lint --config deno.jsonc
+
+      - name: Type-check package and examples
+        if: matrix.deno == 'latest' && matrix.runner == 'ubuntu-24.04'
+        shell: bash
+        run: |
+          deno check --no-lock \
+            src/mod.ts src/signing.ts src/taproot.ts src/historical.ts \
+            src/key_tweaks.ts src/native/mod.ts src/bip324.ts src/musig2.ts \
+            src/lib.ts
+          deno check --no-lock --import-map=doc.import-map.json examples/*.ts
+
+      - name: Lint public documentation
+        if: matrix.deno == 'latest' && matrix.runner == 'ubuntu-24.04'
+        shell: bash
+        run: |
+          deno doc --lint --no-lock \
+            src/mod.ts src/signing.ts src/taproot.ts src/historical.ts \
+            src/key_tweaks.ts src/native/mod.ts src/bip324.ts src/musig2.ts \
+            src/lib.ts
+
+      - name: Type-check documentation examples
+        if: matrix.deno == 'latest' && matrix.runner == 'ubuntu-24.04'
+        shell: bash
+        run: |
+          deno check --doc --no-lock --import-map=doc.import-map.json \
+            src/mod.ts src/signing.ts src/taproot.ts src/historical.ts \
+            src/key_tweaks.ts src/native/mod.ts src/bip324.ts src/musig2.ts \
+            src/lib.ts
+
+      - name: Run documentation examples
+        if: matrix.deno == 'latest' && matrix.runner == 'ubuntu-24.04'
+        shell: bash
+        run: |
+          deno test --doc --no-lock --no-prompt \
+            --import-map=doc.import-map.json \
+            --allow-env=DENO_SECP256K1_PATH --allow-ffi \
+            src/mod.ts src/signing.ts src/taproot.ts src/historical.ts \
+            src/key_tweaks.ts src/native/mod.ts src/bip324.ts src/musig2.ts \
+            src/lib.ts
+
+      - name: Run public examples
+        if: matrix.deno == 'latest' && matrix.runner == 'ubuntu-24.04'
+        shell: bash
+        run: |
+          for example in examples/*.ts; do
+            deno run --no-lock --no-prompt \
+              --import-map=doc.import-map.json \
+              --allow-env=DENO_SECP256K1_PATH --allow-ffi "$example"
+          done
+
+      - name: Render package documentation
+        if: matrix.deno == 'latest' && matrix.runner == 'ubuntu-24.04'
+        shell: bash
+        run: |
+          output="$(mktemp -d)"
+          deno doc --html --no-lock --name='@bonakodo/secp256k1' \
+            --output="$output" \
+            src/mod.ts src/signing.ts src/taproot.ts src/historical.ts \
+            src/key_tweaks.ts src/native/mod.ts src/bip324.ts src/musig2.ts \
+            src/lib.ts
+          test -f "$output/index.html"
+
+      - name: Dry-run JSR publication
+        if: matrix.deno == 'latest' && matrix.runner == 'ubuntu-24.04'
+        run: deno publish --dry-run

@@ -380,7 +380,11 @@ export type NativeSymbols = Deno.DynamicLibrary<
   typeof nativeSymbolDefinitions
 >['symbols'];
 
-/** Names an independently detected native feature group. */
+/**
+ * Names an independently detected native feature group.
+ *
+ * @since 1.0.0
+ */
 export type NativeCapability =
   | 'core'
   | 'extrakeys'
@@ -459,21 +463,41 @@ export const CAPABILITY_SYMBOLS = {
   readonly (keyof NativeSymbols)[]
 >;
 
-/** Availability classification for a native feature group. */
+/**
+ * Availability classification for a native feature group.
+ *
+ * @since 1.0.0
+ */
 export type NativeCapabilityState =
   | 'available'
   | 'unavailable'
   | 'incompatible';
 
-/** Structured availability details for one native feature group. */
+/**
+ * Structured availability details for one native feature group.
+ *
+ * @since 1.0.0
+ */
 export interface NativeCapabilityStatus {
-  /** Classification derived only from symbol presence. */
+  /**
+   * Classification derived only from symbol presence.
+   *
+   * @since 1.0.0
+   */
   readonly state: NativeCapabilityState;
-  /** Required symbols not exported by the selected library. */
+  /**
+   * Required symbols not exported by the selected library.
+   *
+   * @since 1.0.0
+   */
   readonly missingSymbols: readonly string[];
 }
 
-/** Availability details for every native feature group. */
+/**
+ * Availability details for every native feature group.
+ *
+ * @since 1.0.0
+ */
 export type NativeCapabilityStatuses = Readonly<
   Record<NativeCapability, NativeCapabilityStatus>
 >;

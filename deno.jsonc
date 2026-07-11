@@ -1,7 +1,17 @@
 {
   "name": "@bonakodo/secp256k1",
-  "version": "0.5.3",
-  "exports": "./src/lib.ts",
+  "version": "1.0.0",
+  "exports": {
+    ".": "./src/mod.ts",
+    "./signing": "./src/signing.ts",
+    "./taproot": "./src/taproot.ts",
+    "./historical": "./src/historical.ts",
+    "./key-tweaks": "./src/key_tweaks.ts",
+    "./diagnostics": "./src/native/mod.ts",
+    "./bip324": "./src/bip324.ts",
+    "./musig2": "./src/musig2.ts",
+    "./legacy": "./src/lib.ts"
+  },
   "tasks": {
     "coverage": "deno run --allow-run --allow-write --allow-read=. scripts/coverage.ts"
   },
@@ -12,7 +22,10 @@
   },
   "publish": {
     "exclude": [
+      ".github",
+      "deno.lock",
       "secp256k1",
+      "scripts",
       "test",
       ".gitmodules"
     ]

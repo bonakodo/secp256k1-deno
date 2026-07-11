@@ -8,7 +8,10 @@
  *
  * @example Treat malformed peer bytes as invalid
  * ```ts
- * import { Digest32, verifyHistoricalEcdsa } from "./historical.ts";
+ * import {
+ *   Digest32,
+ *   verifyHistoricalEcdsa,
+ * } from "jsr:@bonakodo/secp256k1@1/historical";
  *
  * const valid = verifyHistoricalEcdsa(
  *   new Uint8Array(),
@@ -19,6 +22,7 @@
  * ```
  *
  * @module
+ * @since 1.0.0
  */
 
 import type { Digest32 } from './api/digest.ts';

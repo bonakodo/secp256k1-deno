@@ -12,7 +12,7 @@
  * @example Complete one initiator/responder key exchange.
  * ```ts
  * #!/usr/bin/env -S deno test --allow-env=DENO_SECP256K1_PATH --allow-ffi
- * import { Bip324KeyExchange } from "./bip324.ts";
+ * import { Bip324KeyExchange } from "jsr:@bonakodo/secp256k1@1/bip324";
  *
  * using initiator = Bip324KeyExchange.initiator();
  * using responder = Bip324KeyExchange.responder();
@@ -34,6 +34,7 @@
  * @see https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki
  * @see https://github.com/bitcoin-core/secp256k1/blob/master/include/secp256k1_ellswift.h
  * @module
+ * @since 1.0.0
  */
 
 import { withSigningContext } from './native/context.ts';
@@ -79,17 +80,29 @@ const GROUP_ORDER = Uint8Array.from([
 
 type Bip324Role = 'initiator' | 'responder';
 
-/** Stable reasons for rejecting BIP324 API input. @since 1.1.0 */
+/**
+ * Stable reasons for rejecting BIP324 API input.
+ *
+ * @since 1.0.0
+ */
 export type Bip324InputErrorCode =
   | 'invalid-ellswift-length'
   | 'invalid-peer-encoding';
 
-/** Stable reasons why a stateful BIP324 handle cannot be used. @since 1.1.0 */
+/**
+ * Stable reasons why a stateful BIP324 handle cannot be used.
+ *
+ * @since 1.0.0
+ */
 export type Bip324StateErrorCode =
   | 'exchange-consumed'
   | 'shared-secret-consumed';
 
-/** Stable reasons why a native BIP324 operation failed. @since 1.1.0 */
+/**
+ * Stable reasons why a native BIP324 operation failed.
+ *
+ * @since 1.0.0
+ */
 export type Bip324NativeErrorCode =
   | 'ellswift-create-failed'
   | 'hash-callback-unavailable'
@@ -101,17 +114,21 @@ export type Bip324NativeErrorCode =
  * Peer-controlled serialized encodings should be passed to
  * {@link EllSwiftEncoding.tryFromBytes}, which returns `null` instead.
  *
- * @since 1.1.0
+ * @since 1.0.0
  */
 export class Bip324InputError extends TypeError {
-  /** Stable reason for the rejected input. @since 1.1.0 */
+  /**
+   * Stable reason for the rejected input.
+   *
+   * @since 1.0.0
+   */
   readonly code: Bip324InputErrorCode;
 
   /**
    * Creates a typed BIP324 input error.
    *
    * @param code Stable reason for the rejected input.
-   * @since 1.1.0
+   * @since 1.0.0
    */
   constructor(code: Bip324InputErrorCode) {
     super(inputErrorMessage(code));
@@ -123,17 +140,21 @@ export class Bip324InputError extends TypeError {
 /**
  * Reports reuse of a consumed or destroyed secret-bearing handle.
  *
- * @since 1.1.0
+ * @since 1.0.0
  */
 export class Bip324StateError extends Error {
-  /** Stable reason why the handle is unavailable. @since 1.1.0 */
+  /**
+   * Stable reason why the handle is unavailable.
+   *
+   * @since 1.0.0
+   */
   readonly code: Bip324StateErrorCode;
 
   /**
    * Creates a typed BIP324 state error.
    *
    * @param code Stable reason why the handle is unavailable.
-   * @since 1.1.0
+   * @since 1.0.0
    */
   constructor(code: Bip324StateErrorCode) {
     super(stateErrorMessage(code));
@@ -149,10 +170,14 @@ export class Bip324StateError extends Error {
  * their native-layer types. Callback-pointer permission failures are wrapped
  * with `hash-callback-unavailable` and retained as the error `cause`.
  *
- * @since 1.1.0
+ * @since 1.0.0
  */
 export class Bip324NativeError extends Error {
-  /** Stable reason for the native failure. @since 1.1.0 */
+  /**
+   * Stable reason for the native failure.
+   *
+   * @since 1.0.0
+   */
   readonly code: Bip324NativeErrorCode;
 
   /**
@@ -160,7 +185,7 @@ export class Bip324NativeError extends Error {
    *
    * @param code Stable reason for the native failure.
    * @param options Optional underlying failure, retained as `cause`.
-   * @since 1.1.0
+   * @since 1.0.0
    */
   constructor(code: Bip324NativeErrorCode, options?: ErrorOptions) {
     super(nativeErrorMessage(code), options);
@@ -177,7 +202,7 @@ export class Bip324NativeError extends Error {
  * ownership, or peer-identity claim. Input and output arrays are copied.
  *
  * @see https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki
- * @since 1.1.0
+ * @since 1.0.0
  */
 export class EllSwiftEncoding {
   readonly #bytes: Uint8Array;
@@ -195,7 +220,7 @@ export class EllSwiftEncoding {
    * @param bytes Candidate ElligatorSwift wire bytes; copied on success.
    * @returns An immutable encoding that owns a private copy.
    * @throws {Bip324InputError} If `bytes` is not exactly 64 bytes.
-   * @since 1.1.0
+   * @since 1.0.0
    */
   static fromBytes(bytes: Uint8Array): EllSwiftEncoding {
     const encoding = EllSwiftEncoding.tryFromBytes(bytes);
@@ -210,7 +235,7 @@ export class EllSwiftEncoding {
    *
    * @param bytes Candidate wire bytes; copied when exactly 64 bytes long.
    * @returns An immutable encoding, or `null` for any other byte length.
-   * @since 1.1.0
+   * @since 1.0.0
    */
   static tryFromBytes(bytes: Uint8Array): EllSwiftEncoding | null {
     return bytes.length === ELLSWIFT_ENCODING_SIZE
@@ -222,7 +247,7 @@ export class EllSwiftEncoding {
    * Returns the 64-byte ElligatorSwift wire encoding.
    *
    * @returns A detached copy on every call.
-   * @since 1.1.0
+   * @since 1.0.0
    */
   toBytes(): Uint8Array {
     return this.#bytes.slice();
@@ -241,7 +266,7 @@ let createSharedSecret: (bytes: Uint8Array) => Bip324SharedSecret;
  * value has not been consumed. JavaScript cannot guarantee erasure of copies
  * made by the runtime or native library.
  *
- * @since 1.1.0
+ * @since 1.0.0
  */
 export class Bip324SharedSecret implements Disposable {
   #bytes: Uint8Array | null;
@@ -259,7 +284,7 @@ export class Bip324SharedSecret implements Disposable {
    *
    * @returns A detached 32-byte copy that the caller must wipe after use.
    * @throws {Bip324StateError} If already consumed or destroyed.
-   * @since 1.1.0
+   * @since 1.0.0
    */
   consumeBytes(): Uint8Array {
     const bytes = this.#bytes;
@@ -277,7 +302,7 @@ export class Bip324SharedSecret implements Disposable {
    *
    * Calling this method more than once has no effect.
    *
-   * @since 1.1.0
+   * @since 1.0.0
    */
   destroy(): void {
     this.#bytes?.fill(0);
@@ -287,7 +312,7 @@ export class Bip324SharedSecret implements Disposable {
   /**
    * Best-effort wipes this handle for explicit resource management.
    *
-   * @since 1.1.0
+   * @since 1.0.0
    */
   [Symbol.dispose](): void {
     this.destroy();
@@ -304,7 +329,7 @@ export class Bip324SharedSecret implements Disposable {
  * before any native work begins and remains consumed after every outcome.
  *
  * @see https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki
- * @since 1.1.0
+ * @since 1.0.0
  */
 export class Bip324KeyExchange implements Disposable {
   readonly #role: Bip324Role;
@@ -331,7 +356,7 @@ export class Bip324KeyExchange implements Disposable {
    * @throws {Bip324NativeError} If native ElligatorSwift creation fails.
    * @throws {NativeCapabilityError} If libsecp256k1 lacks ElligatorSwift.
    * @throws Native configuration, loading, and context errors unchanged.
-   * @since 1.1.0
+   * @since 1.0.0
    */
   static initiator(): Bip324KeyExchange {
     return Bip324KeyExchange.#generate('initiator');
@@ -347,7 +372,7 @@ export class Bip324KeyExchange implements Disposable {
    * @throws {Bip324NativeError} If native ElligatorSwift creation fails.
    * @throws {NativeCapabilityError} If libsecp256k1 lacks ElligatorSwift.
    * @throws Native configuration, loading, and context errors unchanged.
-   * @since 1.1.0
+   * @since 1.0.0
    */
   static responder(): Bip324KeyExchange {
     return Bip324KeyExchange.#generate('responder');
@@ -360,7 +385,7 @@ export class Bip324KeyExchange implements Disposable {
    * ephemeral secret.
    *
    * @returns A copied immutable wire encoding.
-   * @since 1.1.0
+   * @since 1.0.0
    */
   get encoding(): EllSwiftEncoding {
     return EllSwiftEncoding.fromBytes(this.#encoding);
@@ -381,7 +406,7 @@ export class Bip324KeyExchange implements Disposable {
    * @throws {Bip324NativeError} If callback lookup or native XDH fails.
    * @throws {NativeCapabilityError} If libsecp256k1 lacks ElligatorSwift.
    * @throws Native configuration, loading, and context errors unchanged.
-   * @since 1.1.0
+   * @since 1.0.0
    */
   deriveSharedSecret(peer: EllSwiftEncoding): Bip324SharedSecret {
     const secret = this.#secret;
@@ -447,7 +472,7 @@ export class Bip324KeyExchange implements Disposable {
    * The public encoding remains available. Calling this method more than once
    * has no effect.
    *
-   * @since 1.1.0
+   * @since 1.0.0
    */
   destroy(): void {
     this.#secret?.fill(0);
@@ -457,7 +482,7 @@ export class Bip324KeyExchange implements Disposable {
   /**
    * Best-effort wipes the ephemeral secret for explicit resource management.
    *
-   * @since 1.1.0
+   * @since 1.0.0
    */
   [Symbol.dispose](): void {
     this.destroy();

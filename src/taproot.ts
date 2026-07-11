@@ -8,7 +8,10 @@
  * @example Derive a key-path-only output key
  * ```ts
  * #!/usr/bin/env -S deno run --allow-env=DENO_SECP256K1_PATH --allow-ffi
- * import { taprootTweakPublicKey, XOnlyPublicKey } from "./taproot.ts";
+ * import {
+ *   taprootTweakPublicKey,
+ *   XOnlyPublicKey,
+ * } from "jsr:@bonakodo/secp256k1@1/taproot";
  *
  * const internalKey = XOnlyPublicKey.parse(
  *   Uint8Array.from([0x79, 0xbe, 0x66, 0x7e, 0xf9, 0xdc, 0xbb, 0xac,
@@ -21,6 +24,7 @@
  * ```
  *
  * @module
+ * @since 1.0.0
  */
 
 import { invalidInput } from './api/input.ts';
@@ -69,15 +73,27 @@ const GROUP_ORDER = Uint8Array.from([
   0x41,
 ]);
 
-/** The reason a derived BIP341 TapTweak could not be applied. */
+/**
+ * The reason a derived BIP341 TapTweak could not be applied.
+ *
+ * @since 1.0.0
+ */
 export type TaprootTweakErrorCode =
   | 'invalid-tweak'
   | 'public-key-infinity'
   | 'secret-key-zero';
 
-/** Thrown when a BIP341 tweak scalar or resulting key is invalid. */
+/**
+ * Thrown when a BIP341 tweak scalar or resulting key is invalid.
+ *
+ * @since 1.0.0
+ */
 export class TaprootTweakError extends Error {
-  /** Stable machine-readable failure reason. */
+  /**
+   * Stable machine-readable failure reason.
+   *
+   * @since 1.0.0
+   */
   readonly code: TaprootTweakErrorCode;
 
   /**
@@ -151,43 +167,103 @@ export class TapMerkleRoot {
   }
 }
 
-/** Result of tweaking a BIP341 internal public key. */
+/**
+ * Result of tweaking a BIP341 internal public key.
+ *
+ * @since 1.0.0
+ */
 export interface TaprootPublicKeyTweakResult {
-  /** The immutable 32-byte x-only Taproot output key. */
+  /**
+   * The immutable 32-byte x-only Taproot output key.
+   *
+   * @since 1.0.0
+   */
   readonly outputKey: XOnlyPublicKey;
-  /** The Y parity committed to by a Taproot control block. */
+  /**
+   * The Y parity committed to by a Taproot control block.
+   *
+   * @since 1.0.0
+   */
   readonly outputKeyParity: 0 | 1;
 }
 
-/** Result of tweaking a BIP341 internal secret key. */
+/**
+ * Result of tweaking a BIP341 internal secret key.
+ *
+ * @since 1.0.0
+ */
 export interface TaprootSecretKeyTweakResult {
-  /** A new independently disposable output-key secret. */
+  /**
+   * A new independently disposable output-key secret.
+   *
+   * @since 1.0.0
+   */
   readonly secretKey: SecretKey;
-  /** The Y parity committed to by a Taproot control block. */
+  /**
+   * The Y parity committed to by a Taproot control block.
+   *
+   * @since 1.0.0
+   */
   readonly outputKeyParity: 0 | 1;
 }
 
-/** Input for BIP341 public-key tweaking. */
+/**
+ * Input for BIP341 public-key tweaking.
+ *
+ * @since 1.0.0
+ */
 export interface TaprootPublicKeyTweakInput {
-  /** The validated even-Y x-only internal public key. */
+  /**
+   * The validated even-Y x-only internal public key.
+   *
+   * @since 1.0.0
+   */
   readonly internalKey: XOnlyPublicKey;
-  /** A script-tree root, or `null` when no script tree exists. */
+  /**
+   * A script-tree root, or `null` when no script tree exists.
+   *
+   * @since 1.0.0
+   */
   readonly merkleRoot: TapMerkleRoot | null;
 }
 
-/** Input for BIP341 secret-key tweaking. */
+/**
+ * Input for BIP341 secret-key tweaking.
+ *
+ * @since 1.0.0
+ */
 export interface TaprootSecretKeyTweakInput {
-  /** A live secret whose x-only public key is the internal key. */
+  /**
+   * A live secret whose x-only public key is the internal key.
+   *
+   * @since 1.0.0
+   */
   readonly internalKey: SecretKey;
-  /** A script-tree root, or `null` when no script tree exists. */
+  /**
+   * A script-tree root, or `null` when no script tree exists.
+   *
+   * @since 1.0.0
+   */
   readonly merkleRoot: TapMerkleRoot | null;
 }
 
-/** Input for checking a claimed BIP341 tweak result. */
+/**
+ * Input for checking a claimed BIP341 tweak result.
+ *
+ * @since 1.0.0
+ */
 export interface TaprootTweakCheckInput extends TaprootPublicKeyTweakInput {
-  /** The claimed 32-byte x-only Taproot output key. */
+  /**
+   * The claimed 32-byte x-only Taproot output key.
+   *
+   * @since 1.0.0
+   */
   readonly outputKey: XOnlyPublicKey;
-  /** The claimed output point's Y parity. */
+  /**
+   * The claimed output point's Y parity.
+   *
+   * @since 1.0.0
+   */
   readonly outputKeyParity: 0 | 1;
 }
 

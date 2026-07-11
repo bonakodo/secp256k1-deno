@@ -15,7 +15,7 @@
  *   SchnorrSignature,
  *   verifyTaprootSignature,
  *   XOnlyPublicKey,
- * } from "./mod.ts";
+ * } from "jsr:@bonakodo/secp256k1@1";
  *
  * const digest = Digest32.fromBytes(new Uint8Array(32));
  * const signature = SchnorrSignature.fromBytes(new Uint8Array(64));
@@ -24,6 +24,7 @@
  * ```
  *
  * @module
+ * @since 1.0.0
  */
 
 export { Digest32 } from './api/digest.ts';

@@ -38,21 +38,52 @@ export interface NativeLoaderRuntime {
   open(candidate: string): NativeLibraryHandle;
 }
 
-/** Optional capability requirements checked after core initialization. */
+/**
+ * Optional capability requirements checked after core initialization.
+ *
+ * @since 1.0.0
+ */
 export interface NativeInitializationOptions {
-  /** Capabilities that must be available for this call to succeed. */
+  /**
+   * Capabilities that must be available for this call to succeed.
+   *
+   * @since 1.0.0
+   */
   readonly require?: readonly NativeCapability[];
 }
 
-/** Side-effect-free snapshot of per-isolate native loader state. */
+/**
+ * Side-effect-free snapshot of per-isolate native loader state.
+ *
+ * The selected candidate is the exact string passed to `Deno.dlopen`; it is
+ * not a canonical path or file identity when auto mode selected a bare name.
+ *
+ * @since 1.0.0
+ */
 export interface NativeStatus {
-  /** Loader lifecycle state. */
+  /**
+   * Loader lifecycle state.
+   *
+   * @since 1.0.0
+   */
   readonly state: 'uninitialized' | 'loaded' | 'failed';
-  /** Verbatim selected candidate, or null when no handle was retained. */
+  /**
+   * Verbatim selected candidate, or null when no handle was retained.
+   *
+   * @since 1.0.0
+   */
   readonly selectedCandidate: string | null;
-  /** Independent symbol-derived capability states. */
+  /**
+   * Independent symbol-derived capability states.
+   *
+   * @since 1.0.0
+   */
   readonly capabilities: NativeCapabilityStatuses;
-  /** Cached terminal configuration or loading error. */
+  /**
+   * Cached terminal configuration or loading error.
+   *
+   * @since 1.0.0
+   */
   readonly error: NativeInitializationError | null;
 }
 
@@ -283,14 +314,31 @@ const isolateLoader = createNativeLoader({
   },
 });
 
-/** Initializes the one retained native library handle for this Deno isolate. */
+/**
+ * Initializes the one retained native library handle for this Deno isolate.
+ *
+ * Configuration is read once. Both success and terminal failure are cached;
+ * later environment changes have no effect in the same isolate.
+ *
+ * @param options Optional native module capabilities required by the caller.
+ * @returns A copied status snapshot for the retained handle.
+ * @throws {NativeConfigError} If configuration is missing or invalid.
+ * @throws {NativeLoadError} If no configured candidate has a complete core ABI.
+ * @throws {NativeCapabilityError} If a requested optional module is unavailable.
+ * @since 1.0.0
+ */
 export function initializeNative(
   options: NativeInitializationOptions = {},
 ): NativeStatus {
   return isolateLoader.initialize(options);
 }
 
-/** Returns native loader state without environment access or FFI loading. */
+/**
+ * Returns native loader state without environment access or FFI loading.
+ *
+ * @returns A detached status snapshot; arrays can be mutated safely by callers.
+ * @since 1.0.0
+ */
 export function nativeStatus(): NativeStatus {
   return isolateLoader.status();
 }

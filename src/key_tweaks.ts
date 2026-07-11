@@ -7,8 +7,11 @@
  * @example Add one to a secret key
  * ```ts
  * #!/usr/bin/env -S deno run --allow-env=DENO_SECP256K1_PATH --allow-ffi
- * import { addTweakToSecretKey, Tweak32 } from "./key_tweaks.ts";
- * import { SecretKey } from "./signing.ts";
+ * import {
+ *   addTweakToSecretKey,
+ *   Tweak32,
+ * } from "jsr:@bonakodo/secp256k1@1/key-tweaks";
+ * import { SecretKey } from "jsr:@bonakodo/secp256k1@1/signing";
  *
  * const one = new Uint8Array(32);
  * one[31] = 1;
@@ -18,6 +21,7 @@
  * ```
  *
  * @module
+ * @since 1.0.0
  */
 
 import { invalidInput } from './api/input.ts';
@@ -65,12 +69,24 @@ const GROUP_ORDER = Uint8Array.from([
 ]);
 const EC_COMPRESSED = 258;
 
-/** The reason an otherwise valid additive tweak could not be applied. */
+/**
+ * The reason an otherwise valid additive tweak could not be applied.
+ *
+ * @since 1.0.0
+ */
 export type KeyTweakErrorCode = 'secret-key-zero' | 'public-key-infinity';
 
-/** Thrown when additive key arithmetic produces an invalid curve result. */
+/**
+ * Thrown when additive key arithmetic produces an invalid curve result.
+ *
+ * @since 1.0.0
+ */
 export class KeyTweakError extends Error {
-  /** Stable machine-readable failure reason. */
+  /**
+   * Stable machine-readable failure reason.
+   *
+   * @since 1.0.0
+   */
   readonly code: KeyTweakErrorCode;
 
   /**
