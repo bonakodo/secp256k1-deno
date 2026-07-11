@@ -6,6 +6,23 @@ const scriptDir = await Deno.makeTempDir({
   prefix: 'secp256k1-deno-coverage-scripts.',
 });
 const libraryDir = `${root}secp256k1/build-deno/lib`;
+const dynamicLibraryPathVariable = Deno.build.os === 'darwin'
+  ? 'DYLD_LIBRARY_PATH'
+  : Deno.build.os === 'linux'
+  ? 'LD_LIBRARY_PATH'
+  : undefined;
+
+let scriptDirRemoved = false;
+function removeScriptDir(): void {
+  if (scriptDirRemoved) return;
+  scriptDirRemoved = true;
+  try {
+    Deno.removeSync(scriptDir, { recursive: true });
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotFound)) throw error;
+  }
+}
+globalThis.addEventListener('unload', removeScriptDir);
 
 async function findNativeLibrary(): Promise<string> {
   const patterns: Partial<Record<typeof Deno.build.os, RegExp>> = {
@@ -35,6 +52,24 @@ async function findNativeLibrary(): Promise<string> {
 }
 
 const libraryPath = await findNativeLibrary();
+
+async function findCCompiler(): Promise<string> {
+  for (const candidate of ['cc', 'clang', 'gcc']) {
+    try {
+      const result = await new Deno.Command(candidate, {
+        args: ['--version'],
+        stdout: 'null',
+        stderr: 'null',
+      }).output();
+      if (result.success) return candidate;
+    } catch (error) {
+      if (!(error instanceof Deno.errors.NotFound)) throw error;
+    }
+  }
+  throw new Error('No supported C compiler found (tried cc, clang, and gcc)');
+}
+
+const cCompiler = await findCCompiler();
 
 async function writeScript(name: string, source: string): Promise<string> {
   const path = `${scriptDir}/${name}`;
@@ -92,15 +127,21 @@ async function compileFaultLibrary(
     : [
       '-shared',
       '-fPIC',
-      '-Wl,--no-as-needed',
-      libraryPath,
       `-Wl,-rpath,${libraryDir}`,
     ];
-  const command = new Deno.Command('clang', {
+  const linkArgs = Deno.build.os === 'darwin'
+    ? []
+    : ['-Wl,--no-as-needed', libraryPath, '-ldl'];
+  const command = new Deno.Command(cCompiler, {
     args: [
+      '-std=c11',
+      '-Wall',
+      '-Wextra',
+      '-Werror',
       ...platformArgs,
       ...defines.map((define) => `-D${define}`),
       fixture,
+      ...linkArgs,
       '-o',
       output,
     ],
@@ -936,7 +977,9 @@ await runDeno(
   ],
   {
     clearEnv: true,
-    env: { DYLD_LIBRARY_PATH: libraryDir },
+    env: dynamicLibraryPathVariable === undefined
+      ? undefined
+      : { [dynamicLibraryPathVariable]: libraryDir },
   },
 );
 
@@ -962,7 +1005,9 @@ await runDeno(
   ],
   {
     clearEnv: true,
-    env: { DYLD_LIBRARY_PATH: libraryDir },
+    env: dynamicLibraryPathVariable === undefined
+      ? undefined
+      : { [dynamicLibraryPathVariable]: libraryDir },
   },
 );
 
@@ -998,6 +1043,7 @@ if (linesFound === 0 || linesHit !== linesFound) {
 console.log(`Line coverage threshold: 100.0% (${linesHit}/${linesFound})`);
 
 console.log(`Coverage profile: ${coverageDir}`);
+removeScriptDir();
 
 function sumLcovMetric(lcov: string, metric: 'LF' | 'LH'): number {
   let total = 0;

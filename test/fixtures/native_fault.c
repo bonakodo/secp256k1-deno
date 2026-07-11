@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -17,15 +21,38 @@ typedef int (*fault_function)(
 #define STRINGIFY_INNER(value) #value
 #define STRINGIFY(value) STRINGIFY_INNER(value)
 
+static void *fault_symbol_address(void) {
+  static void *address = NULL;
+  if (address == NULL) {
+    address = dlsym(RTLD_NEXT, STRINGIFY(FAULT_SYMBOL));
+  }
+  return address;
+}
+
+static int fault_called_from_native_library(void *return_address) {
+  Dl_info caller;
+  Dl_info native;
+  if (dladdr(return_address, &caller) == 0 ||
+      dladdr(fault_symbol_address(), &native) == 0) {
+    return 0;
+  }
+  return caller.dli_fbase == native.dli_fbase;
+}
+
 int FAULT_SYMBOL(
     uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5,
     uintptr_t a6, uintptr_t a7, uintptr_t a8, uintptr_t a9, uintptr_t a10) {
   static unsigned int calls = 0;
-  calls++;
+  void *return_address =
+      __builtin_extract_return_addr(__builtin_return_address(0));
+  int external_call = !fault_called_from_native_library(return_address);
+  if (external_call) {
+    calls++;
+  }
 #if !defined(FAIL_CALL)
 #define FAIL_CALL 1
 #endif
-  if (calls == FAIL_CALL) {
+  if (external_call && calls == FAIL_CALL) {
 #if defined(ZERO_SECOND_OUTPUT)
     memset((void *)a2, 0, 64);
     return 1;
@@ -33,8 +60,7 @@ int FAULT_SYMBOL(
     return 0;
 #endif
   }
-  fault_function function =
-      (fault_function)dlsym(RTLD_NEXT, STRINGIFY(FAULT_SYMBOL));
+  fault_function function = (fault_function)fault_symbol_address();
   return function(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10);
 }
 #elif defined(NULL_POINTER_SYMBOL)
