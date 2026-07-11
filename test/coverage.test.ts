@@ -2,10 +2,12 @@ import { assertEquals, assertThrows, hexToBytes, N } from './deps.ts';
 import * as secp256k1 from '../src/lib.ts';
 
 async function bip340TaggedHash(
-  message: Uint8Array<ArrayBuffer>,
-  tag: Uint8Array<ArrayBuffer>,
+  message: Uint8Array,
+  tag: Uint8Array,
 ): Promise<Uint8Array> {
-  const tagHash = new Uint8Array(await crypto.subtle.digest('SHA-256', tag));
+  const tagHash = new Uint8Array(
+    await crypto.subtle.digest('SHA-256', Uint8Array.from(tag)),
+  );
   return new Uint8Array(
     await crypto.subtle.digest(
       'SHA-256',

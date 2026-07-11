@@ -390,6 +390,16 @@ expectError(
 );`,
   },
   {
+    name: 'sign-ecdsa-post-verify',
+    defines: ['FAULT_SYMBOL=secp256k1_ecdsa_verify'],
+    body: `
+using key = SecretKey.fromBytes(scalar(1));
+expectError(
+  () => signEcdsa(Digest32.fromBytes(new Uint8Array(32)), key),
+  'post-verification failed',
+);`,
+  },
+  {
     name: 'sign-schnorr-keypair',
     defines: ['FAULT_SYMBOL=secp256k1_keypair_create'],
     body: `
