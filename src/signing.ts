@@ -10,18 +10,31 @@
  * @since 1.0.0
  */
 
-import type { Digest32 } from './api/digest.ts';
-import { PublicKey, XOnlyPublicKey } from './api/keys.ts';
+import * as digest from './api/digest.ts';
+import * as keys from './api/keys.ts';
 import { invalidInput } from './api/input.ts';
-import { EcdsaSignature, SchnorrSignature } from './api/signatures.ts';
+import * as signatures from './api/signatures.ts';
 import { verifyEcdsa } from './api/verify.ts';
 import { withSigningContext, withStaticContext } from './native/context.ts';
 import { getNativeSymbols, requireCapability } from './native/loader.ts';
 
-export { Digest32 } from './api/digest.ts';
-export { CompressedPublicKey, PublicKey, XOnlyPublicKey } from './api/keys.ts';
+// Explicit aliases keep duplicate entrypoint exports documented by JSR while
+// preserving the identity of these immutable source bindings.
+/** An immutable 32-byte digest supplied to Bitcoin signature operations. */
+// deno-lint-ignore no-unused-vars
+export import Digest32 = digest.Digest32;
+/** A canonical compressed SEC public key. */
+// deno-lint-ignore no-unused-vars
+export import CompressedPublicKey = keys.CompressedPublicKey;
+/** A validated SEC public key in a supported encoding. */
+export import PublicKey = keys.PublicKey;
+/** A validated 32-byte x-only public key. */
+export import XOnlyPublicKey = keys.XOnlyPublicKey;
 export type { PublicKeyEncoding } from './api/keys.ts';
-export { EcdsaSignature, SchnorrSignature } from './api/signatures.ts';
+/** A validated ECDSA signature. */
+export import EcdsaSignature = signatures.EcdsaSignature;
+/** An immutable 64-byte BIP340 Schnorr signature candidate. */
+export import SchnorrSignature = signatures.SchnorrSignature;
 
 const SECRET_KEY_SIZE = 32;
 const PUBLIC_KEY_SIZE = 64;

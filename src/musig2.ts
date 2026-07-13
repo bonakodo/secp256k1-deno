@@ -30,26 +30,28 @@
  * @since 1.0.0
  */
 
-import { Digest32 } from './api/digest.ts';
+import * as digest from './api/digest.ts';
 import { copyExact, invalidInput } from './api/input.ts';
-import {
-  CompressedPublicKey,
-  nativePublicKey,
-  nativeXOnlyPublicKey,
-  PublicKey,
-  XOnlyPublicKey,
-} from './api/keys.ts';
-import { SchnorrSignature } from './api/signatures.ts';
+import * as keys from './api/keys.ts';
+import { nativePublicKey, nativeXOnlyPublicKey } from './api/keys.ts';
+import * as signatures from './api/signatures.ts';
 import { withSigningContext, withStaticContext } from './native/context.ts';
 import { getNativeSymbols, requireCapability } from './native/loader.ts';
 
-export {
-  CompressedPublicKey,
-  Digest32,
-  PublicKey,
-  SchnorrSignature,
-  XOnlyPublicKey,
-};
+// Explicit aliases keep duplicate entrypoint exports documented by JSR while
+// preserving the identity of these immutable source bindings.
+/** A canonical compressed participant public key. */
+export import CompressedPublicKey = keys.CompressedPublicKey;
+/** An immutable 32-byte digest supplied to MuSig2 signing. */
+// deno-lint-ignore no-unused-vars
+export import Digest32 = digest.Digest32;
+/** A validated SEC public key accepted during key aggregation. */
+// deno-lint-ignore no-unused-vars
+export import PublicKey = keys.PublicKey;
+/** An immutable 64-byte BIP340 aggregate-signature candidate. */
+export import SchnorrSignature = signatures.SchnorrSignature;
+/** A validated 32-byte x-only aggregate or tweaked public key. */
+export import XOnlyPublicKey = keys.XOnlyPublicKey;
 export type { PublicKeyEncoding } from './api/keys.ts';
 
 const PUBLIC_NONCE_BYTES = 66;

@@ -25,13 +25,22 @@
  * @since 1.0.0
  */
 
-import type { Digest32 } from './api/digest.ts';
-import { nativePublicKey, PublicKey } from './api/keys.ts';
+import * as digest from './api/digest.ts';
+import * as keys from './api/keys.ts';
+import { nativePublicKey } from './api/keys.ts';
 import { withStaticContext } from './native/context.ts';
 import { getNativeSymbols } from './native/loader.ts';
 
-export { Digest32 } from './api/digest.ts';
-export { CompressedPublicKey, PublicKey } from './api/keys.ts';
+// Explicit aliases keep duplicate entrypoint exports documented by JSR while
+// preserving the identity of these immutable source bindings.
+/** An immutable 32-byte digest supplied to historical ECDSA verification. */
+// deno-lint-ignore no-unused-vars
+export import Digest32 = digest.Digest32;
+/** A canonical compressed SEC public key. */
+// deno-lint-ignore no-unused-vars
+export import CompressedPublicKey = keys.CompressedPublicKey;
+/** A validated SEC public key, including historical hybrid encodings. */
+export import PublicKey = keys.PublicKey;
 export type { PublicKeyEncoding } from './api/keys.ts';
 
 /**

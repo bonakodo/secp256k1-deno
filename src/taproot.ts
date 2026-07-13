@@ -28,12 +28,16 @@
  */
 
 import { invalidInput } from './api/input.ts';
-import { nativeXOnlyPublicKey, XOnlyPublicKey } from './api/keys.ts';
+import * as keys from './api/keys.ts';
+import { nativeXOnlyPublicKey } from './api/keys.ts';
 import { withSigningContext, withStaticContext } from './native/context.ts';
 import { getNativeSymbols, requireCapability } from './native/loader.ts';
 import { SecretKey } from './signing.ts';
 
-export { XOnlyPublicKey } from './api/keys.ts';
+// This explicit alias keeps the duplicate entrypoint export documented by JSR
+// while preserving the identity of the immutable source binding.
+/** A validated 32-byte x-only public key used by Taproot. */
+export import XOnlyPublicKey = keys.XOnlyPublicKey;
 
 const TAP_TWEAK_TAG = new TextEncoder().encode('TapTweak');
 const KEYPAIR_SIZE = 96;

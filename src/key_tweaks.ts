@@ -25,12 +25,19 @@
  */
 
 import { invalidInput } from './api/input.ts';
-import { nativePublicKey, PublicKey } from './api/keys.ts';
+import * as keys from './api/keys.ts';
+import { nativePublicKey } from './api/keys.ts';
 import { withSigningContext, withStaticContext } from './native/context.ts';
 import { getNativeSymbols } from './native/loader.ts';
 import { SecretKey } from './signing.ts';
 
-export { CompressedPublicKey, PublicKey } from './api/keys.ts';
+// Explicit aliases keep duplicate entrypoint exports documented by JSR while
+// preserving the identity of these immutable source bindings.
+/** A canonical compressed SEC public key. */
+// deno-lint-ignore no-unused-vars
+export import CompressedPublicKey = keys.CompressedPublicKey;
+/** A validated SEC public key accepted by additive key tweaks. */
+export import PublicKey = keys.PublicKey;
 export type { PublicKeyEncoding } from './api/keys.ts';
 
 const GROUP_ORDER = Uint8Array.from([
