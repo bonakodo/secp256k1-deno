@@ -3,7 +3,7 @@ export {
   assertEquals,
   assertNotEquals,
   assertThrows,
-} from 'jsr:@std/assert@1';
+} from '@std/assert';
 
 // The native loader intentionally retains its dynamic library for the process.
 export function ffiTest(

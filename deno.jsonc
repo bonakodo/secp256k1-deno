@@ -41,5 +41,8 @@
     "exclude": [
       "secp256k1/"
     ]
+  },
+  "imports": {
+    "@std/assert": "jsr:@std/assert@1.0.19"
   }
 }
