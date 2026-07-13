@@ -94,7 +94,7 @@ export class SecretKeyDestroyedError extends Error {
  * @example Generate and dispose a key
  * ```ts
  * #!/usr/bin/env -S deno run --allow-env=DENO_SECP256K1_PATH --allow-ffi
- * import { SecretKey } from "jsr:@bonakodo/secp256k1@1/signing";
+ * import { SecretKey } from "jsr:@bonakodo/secp256k1@1/signing.ts";
  *
  * using secretKey = SecretKey.generate();
  * const publicKey = secretKey.publicKey();

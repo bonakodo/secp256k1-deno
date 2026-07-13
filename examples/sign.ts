@@ -2,7 +2,7 @@
 // deno-lint-ignore-file no-import-prefix
 
 import { Digest32, verifyEcdsa } from 'jsr:@bonakodo/secp256k1@1';
-import { SecretKey, signEcdsa } from 'jsr:@bonakodo/secp256k1@1/signing';
+import { SecretKey, signEcdsa } from 'jsr:@bonakodo/secp256k1@1/signing.ts';
 
 const secretBytes = new Uint8Array(32);
 secretBytes[31] = 1;

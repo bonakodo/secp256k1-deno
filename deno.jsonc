@@ -3,14 +3,13 @@
   "version": "1.0.0",
   "exports": {
     ".": "./src/mod.ts",
-    "./signing": "./src/signing.ts",
-    "./taproot": "./src/taproot.ts",
-    "./historical": "./src/historical.ts",
-    "./key-tweaks": "./src/key_tweaks.ts",
-    "./diagnostics": "./src/native/mod.ts",
-    "./bip324": "./src/bip324.ts",
-    "./musig2": "./src/musig2.ts",
-    "./legacy": "./src/lib.ts"
+    "./signing.ts": "./src/signing.ts",
+    "./taproot.ts": "./src/taproot.ts",
+    "./historical.ts": "./src/historical.ts",
+    "./key-tweaks.ts": "./src/key_tweaks.ts",
+    "./diagnostics.ts": "./src/native/mod.ts",
+    "./bip324.ts": "./src/bip324.ts",
+    "./musig2.ts": "./src/musig2.ts"
   },
   "tasks": {
     "coverage": "deno run --allow-run --allow-write --allow-read=. scripts/coverage.ts"
@@ -27,6 +26,9 @@
       "secp256k1",
       "scripts",
       "test",
+      "src/assertLength.ts",
+      "src/ffi.ts",
+      "src/lib.ts",
       ".gitmodules"
     ]
   },

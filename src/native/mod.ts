@@ -11,7 +11,7 @@
  * import {
  *   initializeNative,
  *   nativeStatus,
- * } from "jsr:@bonakodo/secp256k1@1/diagnostics";
+ * } from "jsr:@bonakodo/secp256k1@1/diagnostics.ts";
  *
  * initializeNative({ require: ["extrakeys", "schnorrsig"] });
  * console.assert(nativeStatus().state === "loaded");

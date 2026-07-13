@@ -1,13 +1,12 @@
 {
   "imports": {
     "jsr:@bonakodo/secp256k1@1": "./src/mod.ts",
-    "jsr:@bonakodo/secp256k1@1/signing": "./src/signing.ts",
-    "jsr:@bonakodo/secp256k1@1/taproot": "./src/taproot.ts",
-    "jsr:@bonakodo/secp256k1@1/historical": "./src/historical.ts",
-    "jsr:@bonakodo/secp256k1@1/key-tweaks": "./src/key_tweaks.ts",
-    "jsr:@bonakodo/secp256k1@1/diagnostics": "./src/native/mod.ts",
-    "jsr:@bonakodo/secp256k1@1/bip324": "./src/bip324.ts",
-    "jsr:@bonakodo/secp256k1@1/musig2": "./src/musig2.ts",
-    "jsr:@bonakodo/secp256k1@1/legacy": "./src/lib.ts"
+    "jsr:@bonakodo/secp256k1@1/signing.ts": "./src/signing.ts",
+    "jsr:@bonakodo/secp256k1@1/taproot.ts": "./src/taproot.ts",
+    "jsr:@bonakodo/secp256k1@1/historical.ts": "./src/historical.ts",
+    "jsr:@bonakodo/secp256k1@1/key-tweaks.ts": "./src/key_tweaks.ts",
+    "jsr:@bonakodo/secp256k1@1/diagnostics.ts": "./src/native/mod.ts",
+    "jsr:@bonakodo/secp256k1@1/bip324.ts": "./src/bip324.ts",
+    "jsr:@bonakodo/secp256k1@1/musig2.ts": "./src/musig2.ts"
   }
 }

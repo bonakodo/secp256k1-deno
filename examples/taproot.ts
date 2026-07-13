@@ -5,7 +5,7 @@ import {
   checkTaprootTweak,
   taprootTweakPublicKey,
   XOnlyPublicKey,
-} from 'jsr:@bonakodo/secp256k1@1/taproot';
+} from 'jsr:@bonakodo/secp256k1@1/taproot.ts';
 
 const internalKey = XOnlyPublicKey.parse(
   Uint8Array.from(

@@ -11,7 +11,7 @@
  * import {
  *   Digest32,
  *   verifyHistoricalEcdsa,
- * } from "jsr:@bonakodo/secp256k1@1/historical";
+ * } from "jsr:@bonakodo/secp256k1@1/historical.ts";
  *
  * const valid = verifyHistoricalEcdsa(
  *   new Uint8Array(),

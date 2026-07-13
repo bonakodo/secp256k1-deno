@@ -11,7 +11,7 @@
  * import {
  *   taprootTweakPublicKey,
  *   XOnlyPublicKey,
- * } from "jsr:@bonakodo/secp256k1@1/taproot";
+ * } from "jsr:@bonakodo/secp256k1@1/taproot.ts";
  *
  * const internalKey = XOnlyPublicKey.parse(
  *   Uint8Array.from([0x79, 0xbe, 0x66, 0x7e, 0xf9, 0xdc, 0xbb, 0xac,

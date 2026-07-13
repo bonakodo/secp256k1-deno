@@ -162,8 +162,7 @@ jobs:
         run: |
           deno check --no-lock \
             src/mod.ts src/signing.ts src/taproot.ts src/historical.ts \
-            src/key_tweaks.ts src/native/mod.ts src/bip324.ts src/musig2.ts \
-            src/lib.ts
+            src/key_tweaks.ts src/native/mod.ts src/bip324.ts src/musig2.ts
           deno check --no-lock --import-map=doc.import-map.json examples/*.ts
 
       - name: Lint public documentation
@@ -172,8 +171,7 @@ jobs:
         run: |
           deno doc --lint --no-lock \
             src/mod.ts src/signing.ts src/taproot.ts src/historical.ts \
-            src/key_tweaks.ts src/native/mod.ts src/bip324.ts src/musig2.ts \
-            src/lib.ts
+            src/key_tweaks.ts src/native/mod.ts src/bip324.ts src/musig2.ts
 
       - name: Type-check documentation examples
         if: matrix.deno == 'latest' && matrix.runner == 'ubuntu-24.04'
@@ -181,8 +179,7 @@ jobs:
         run: |
           deno check --doc --no-lock --import-map=doc.import-map.json \
             src/mod.ts src/signing.ts src/taproot.ts src/historical.ts \
-            src/key_tweaks.ts src/native/mod.ts src/bip324.ts src/musig2.ts \
-            src/lib.ts
+            src/key_tweaks.ts src/native/mod.ts src/bip324.ts src/musig2.ts
 
       - name: Run documentation examples
         if: matrix.deno == 'latest' && matrix.runner == 'ubuntu-24.04'
@@ -192,8 +189,7 @@ jobs:
             --import-map=doc.import-map.json \
             --allow-env=DENO_SECP256K1_PATH --allow-ffi \
             src/mod.ts src/signing.ts src/taproot.ts src/historical.ts \
-            src/key_tweaks.ts src/native/mod.ts src/bip324.ts src/musig2.ts \
-            src/lib.ts
+            src/key_tweaks.ts src/native/mod.ts src/bip324.ts src/musig2.ts
 
       - name: Run public examples
         if: matrix.deno == 'latest' && matrix.runner == 'ubuntu-24.04'
@@ -213,8 +209,7 @@ jobs:
           deno doc --html --no-lock --name='@bonakodo/secp256k1' \
             --output="$output" \
             src/mod.ts src/signing.ts src/taproot.ts src/historical.ts \
-            src/key_tweaks.ts src/native/mod.ts src/bip324.ts src/musig2.ts \
-            src/lib.ts
+            src/key_tweaks.ts src/native/mod.ts src/bip324.ts src/musig2.ts
           test -f "$output/index.html"
 
       - name: Dry-run JSR publication

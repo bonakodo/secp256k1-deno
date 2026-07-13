@@ -10,8 +10,8 @@
  * import {
  *   addTweakToSecretKey,
  *   Tweak32,
- * } from "jsr:@bonakodo/secp256k1@1/key-tweaks";
- * import { SecretKey } from "jsr:@bonakodo/secp256k1@1/signing";
+ * } from "jsr:@bonakodo/secp256k1@1/key-tweaks.ts";
+ * import { SecretKey } from "jsr:@bonakodo/secp256k1@1/signing.ts";
  *
  * const one = new Uint8Array(32);
  * one[31] = 1;

@@ -8,8 +8,8 @@ import {
   MuSigKeyAggregation,
   MuSigSecretNonce,
   MuSigSession,
-} from 'jsr:@bonakodo/secp256k1@1/musig2';
-import { SecretKey } from 'jsr:@bonakodo/secp256k1@1/signing';
+} from 'jsr:@bonakodo/secp256k1@1/musig2.ts';
+import { SecretKey } from 'jsr:@bonakodo/secp256k1@1/signing.ts';
 
 const scalar = (value: number): Uint8Array => {
   const bytes = new Uint8Array(32);

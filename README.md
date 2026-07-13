@@ -113,7 +113,7 @@ import { Digest32, verifyTaprootSignature } from 'jsr:@bonakodo/secp256k1@1';
 import {
   SecretKey,
   signTaprootSignature,
-} from 'jsr:@bonakodo/secp256k1@1/signing';
+} from 'jsr:@bonakodo/secp256k1@1/signing.ts';
 
 using secretKey = SecretKey.generate();
 const digest = Digest32.fromBytes(taprootSighash);
@@ -129,17 +129,16 @@ code, the runtime, or native dependencies.
 
 ## Entrypoints
 
-| Import                            | Purpose                                                        |
-| --------------------------------- | -------------------------------------------------------------- |
-| `@bonakodo/secp256k1`             | Safe ECDSA and Taproot verification plus native initialization |
-| `@bonakodo/secp256k1/signing`     | Disposable secret keys and Bitcoin signing                     |
-| `@bonakodo/secp256k1/taproot`     | BIP341 public and secret key tweaking                          |
-| `@bonakodo/secp256k1/historical`  | Bitcoin Core-compatible pre-BIP66 lax-DER verification         |
-| `@bonakodo/secp256k1/key-tweaks`  | Additive key tweaks for BIP32-like derivation                  |
-| `@bonakodo/secp256k1/diagnostics` | Lazy native initialization and capability status               |
-| `@bonakodo/secp256k1/bip324`      | Role-bound ElligatorSwift shared-secret derivation             |
-| `@bonakodo/secp256k1/musig2`      | Indexed, nonce-safe BIP327 signing                             |
-| `@bonakodo/secp256k1/legacy`      | Version 0.5.3 compatibility surface                            |
+| Import                               | Purpose                                                        |
+| ------------------------------------ | -------------------------------------------------------------- |
+| `@bonakodo/secp256k1`                | Safe ECDSA and Taproot verification plus native initialization |
+| `@bonakodo/secp256k1/signing.ts`     | Disposable secret keys and Bitcoin signing                     |
+| `@bonakodo/secp256k1/taproot.ts`     | BIP341 public and secret key tweaking                          |
+| `@bonakodo/secp256k1/historical.ts`  | Bitcoin Core-compatible pre-BIP66 lax-DER verification         |
+| `@bonakodo/secp256k1/key-tweaks.ts`  | Additive key tweaks for BIP32-like derivation                  |
+| `@bonakodo/secp256k1/diagnostics.ts` | Lazy native initialization and capability status               |
+| `@bonakodo/secp256k1/bip324.ts`      | Role-bound ElligatorSwift shared-secret derivation             |
+| `@bonakodo/secp256k1/musig2.ts`      | Indexed, nonce-safe BIP327 signing                             |
 
 `historical` exposes one cryptographic compatibility primitive. It is not a
 Bitcoin consensus engine and does not decide activation heights, script flags,
@@ -154,28 +153,6 @@ stable on Linux x86_64/aarch64, macOS x86_64/aarch64, and Windows x86_64.
 GitHub's `macos-15-intel` line is the final standard hosted Intel macOS runner;
 Windows Arm64 is not in the declared support matrix. Windows supports explicit
 DLL paths only.
-
-## Migration from 0.5.3
-
-Version 1 moves byte validation and secret ownership into explicit types:
-
-| 0.5.3 function                   | Version 1 API                                                        |
-| -------------------------------- | -------------------------------------------------------------------- |
-| `secretKeyVerify(bytes)`         | `SecretKey.fromBytes(bytes)`                                         |
-| `publicKeyVerify(bytes)`         | `PublicKey.tryParse(bytes) !== null`                                 |
-| `publicKeyCreate(secret)`        | `SecretKey.fromBytes(secret).publicKey()`                            |
-| `ecdsaSign(hash, secret)`        | `signEcdsa(Digest32.fromBytes(hash), key)`                           |
-| `ecdsaVerify(sig, hash, pubkey)` | `verifyEcdsa(EcdsaSignature, Digest32, PublicKey)`                   |
-| `signatureImport(der)`           | `EcdsaDerSignature.fromBytes(der).decode()`                          |
-| `signatureExport(sig)`           | `EcdsaSignature.toDer()`                                             |
-| `schnorrSign(hash, secret)`      | `signTaprootSignature(Digest32, SecretKey)`                          |
-| `schnorrVerify(sig, hash, key)`  | `verifyTaprootSignature(SchnorrSignature, Digest32, XOnlyPublicKey)` |
-| `publicKeyTweakAdd`              | `addTweakToPublicKey(PublicKey, Tweak32)`                            |
-| `secretKeyTweakAdd`              | `addTweakToSecretKey(SecretKey, Tweak32)`                            |
-
-The `legacy` entrypoint preserves the old mutable-buffer and loading behavior
-for migration. New node code should use the version 1 entrypoints and mandatory
-configuration above.
 
 ## Release checklist
 

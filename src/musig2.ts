@@ -16,7 +16,7 @@
  * @example Parse an untrusted public nonce
  * ```ts
  * #!/usr/bin/env -S deno run --allow-env=DENO_SECP256K1_PATH --allow-ffi
- * import { MuSigPublicNonce } from "jsr:@bonakodo/secp256k1@1/musig2";
+ * import { MuSigPublicNonce } from "jsr:@bonakodo/secp256k1@1/musig2.ts";
  *
  * const peerBytes = new Uint8Array(66);
  * const nonce = MuSigPublicNonce.tryFromBytes(peerBytes);
