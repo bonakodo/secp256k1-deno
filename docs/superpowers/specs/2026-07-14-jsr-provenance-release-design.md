@@ -22,6 +22,10 @@ behavior. The release commit will update the version in `deno.jsonc` and add
 a validation step to `.github/workflows/publish.yml` that reads the package
 version and requires the triggering tag to equal `v<version>`.
 
+The repository-only design and implementation-plan documents will be excluded
+from the published package so the patch release retains the established public
+artifact boundary.
+
 The existing publish job remains responsible for OIDC authentication. It
 retains `id-token: write`, runs only after the reusable test workflow passes,
 performs `deno publish --dry-run`, and then runs `deno publish`. Pushing the
@@ -42,6 +46,7 @@ Before release:
 - Parse `deno.jsonc` and confirm version `1.0.1`.
 - Exercise the tag/version guard locally with one matching and one mismatching
   tag value.
+- Confirm the publish dry run does not include `docs/`.
 - Run `deno fmt --check --config deno.jsonc`.
 - Run `deno lint --config deno.jsonc`.
 - Run `deno publish --dry-run`.

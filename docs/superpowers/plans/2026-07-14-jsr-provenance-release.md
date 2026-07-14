@@ -14,7 +14,7 @@
 
 **Files:**
 
-- Modify: deno.jsonc:3
+- Modify: deno.jsonc:3,16
 - Modify: .github/workflows/publish.yml:21-28
 
 - [ ] **Step 1: Run a failing desired-state assertion**
@@ -92,6 +92,37 @@ fi
 ```
 
 Expected: exit status 1 and an error naming actual tag v0.1.0, package version 1.0.1, and expected tag v1.0.1.
+
+- [ ] **Step 6: Run a failing package-boundary assertion**
+
+```bash
+if deno publish --dry-run --allow-dirty 2>&1 | rg -q '/docs/superpowers/'; then
+  exit 1
+fi
+```
+
+Expected: exit status 1 because the new repository-only release documents are not excluded yet.
+
+- [ ] **Step 7: Exclude internal documents from publication**
+
+Add `docs` to `publish.exclude` in deno.jsonc:
+
+```json
+"publish": {
+  "exclude": [
+    ".github",
+    "docs",
+```
+
+- [ ] **Step 8: Re-run the package-boundary assertion**
+
+```bash
+if deno publish --dry-run --allow-dirty 2>&1 | rg -q '/docs/superpowers/'; then
+  exit 1
+fi
+```
+
+Expected: exit status 0 because internal documents are outside the package artifact.
 
 ### Task 2: Validate and commit the release change
 
