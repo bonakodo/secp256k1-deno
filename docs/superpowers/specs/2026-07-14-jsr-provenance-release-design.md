@@ -69,6 +69,11 @@ complete, the one-time workflow code, repair script, tests, and lockfile will
 be removed. Their executed source remains verifiable in Git history and the
 workflow run.
 
+Version `1.0.2` was published successfully and attached to public Rekor log
+entry `2167350875`. JSR reports that log id on the version and marks “Has
+provenance” complete. The one-time repair path has therefore been removed and
+ordinary `deno publish` restored for future releases.
+
 ## Verification
 
 Before release:
@@ -87,7 +92,7 @@ After pushing the release commit and `v1.0.1` tag:
 - Wait for the GitHub Actions `Publish` workflow to succeed.
 - Confirm its publish log reports a provenance transparency-log URL.
 - Confirm the Rekor entry is publicly retrievable.
-- Confirm JSR lists `1.0.1` as latest and marks “Has provenance” complete.
+- Confirm JSR lists `1.0.1` as latest and records whether provenance attached.
 
 After pushing `v1.0.2`:
 

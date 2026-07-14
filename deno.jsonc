@@ -46,5 +46,6 @@
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@1.0.19"
-  }
+  },
+  "license": "BSD-3-Clause"
 }

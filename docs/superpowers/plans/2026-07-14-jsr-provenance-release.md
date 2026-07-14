@@ -323,11 +323,11 @@ git tag -a v1.0.2 -m 'v1.0.2'
 git push origin v1.0.2
 ```
 
-- [ ] **Step 3: Monitor the publish workflow**
+- [x] **Step 3: Monitor the publish workflow**
 
 Wait for all platform tests, `deno publish --no-provenance`, and the immediate tarball-bound attestation step to succeed.
 
-- [ ] **Step 4: Verify JSR and Rekor independently**
+- [x] **Step 4: Verify JSR and Rekor independently**
 
 Confirm the JSR version API returns a non-null `rekorLogId`, retrieve that
 entry from Rekor, verify its Fulcio certificate identifies this repository's
@@ -344,12 +344,12 @@ after the five-minute score cache expires.
 - Delete: `test/jsr_provenance_repair.test.ts`
 - Modify: `.github/workflows/publish.yml`
 
-- [ ] **Step 1: Remove only the one-time repair files**
+- [x] **Step 1: Remove only the one-time repair files**
 
 Use `apply_patch` to delete the four one-time files and restore the ordinary
 `deno publish` step after remote verification succeeds.
 
-- [ ] **Step 2: Re-run repository checks**
+- [x] **Step 2: Re-run repository checks**
 
 ```bash
 deno fmt --check --config deno.jsonc
@@ -358,7 +358,7 @@ deno publish --dry-run
 git diff --check
 ```
 
-- [ ] **Step 3: Commit and push cleanup**
+- [x] **Step 3: Commit and push cleanup**
 
 ```bash
 git add .github/workflows/repair-provenance.yml scripts/repair_jsr_provenance.ts scripts/provenance.lock test/jsr_provenance_repair.test.ts
