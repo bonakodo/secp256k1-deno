@@ -15,6 +15,13 @@ Rekor log entry `2164636199`. The workflow run was associated with Git ref
 provenance. Published JSR versions are immutable, so `1.0.0` cannot be
 replaced in place.
 
+Version `1.0.1` was subsequently published from the matching `v1.0.1` tag,
+but JSR rejected Deno's provenance bundle. JSR now validates the attested
+digest against the uploaded tarball, while Deno 2.9.2 still attests the JSR
+version manifest digest and does not fail when the provenance endpoint rejects
+that bundle. JSR therefore exposes `rekorLogId: null` for `1.0.1` even though
+Deno created an unassociated Rekor entry.
+
 ## Design
 
 Release patch version `1.0.1` without changing the package API or runtime
@@ -39,6 +46,23 @@ mismatched tag exits with an explicit error showing both the expected and
 actual tag. No registry mutation occurs when this guard fails. Test or dry-run
 failures likewise prevent the publish command from running.
 
+## One-Time Provenance Repair
+
+A version-fixed manual GitHub Actions workflow will repair `1.0.1` without
+republishing or modifying its immutable package bytes. It downloads JSR's
+stored tarball, hashes those exact bytes, creates a SLSA statement for
+`pkg:jsr/@bonakodo/secp256k1@1.0.1`, and signs it through Sigstore using the
+workflow's GitHub OIDC identity. It then requests a separate JSR-scoped GitHub
+OIDC token and submits the converted Sigstore bundle to JSR's provenance
+endpoint.
+
+The repair must fail unless the OIDC requests, Fulcio signing, Rekor upload,
+JSR submission, and JSR version readback all succeed. The workflow will use a
+dedicated dependency lockfile and a pinned Sigstore client. After JSR reports a
+non-null Rekor log id and the score marks provenance complete, the one-time
+workflow, repair script, tests, and lockfile will be removed from the branch.
+Their executed source remains verifiable in Git history and the workflow run.
+
 ## Verification
 
 Before release:
@@ -58,6 +82,14 @@ After pushing the release commit and `v1.0.1` tag:
 - Confirm its publish log reports a provenance transparency-log URL.
 - Confirm the Rekor entry is publicly retrievable.
 - Confirm JSR lists `1.0.1` as latest and marks “Has provenance” complete.
+
+After the one-time repair:
+
+- Confirm the repair workflow succeeds from `master` with `id-token: write`.
+- Confirm JSR's version API returns the repair's Rekor log id for `1.0.1`.
+- Confirm the public Rekor entry carries this repository's workflow identity.
+- Confirm JSR marks “Has provenance” complete.
+- Remove the one-time repair files and rerun the repository checks.
 
 ## Scope
 

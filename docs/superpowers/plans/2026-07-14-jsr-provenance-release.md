@@ -244,3 +244,109 @@ exit 1
 ```
 
 Expected: exit status 0 after JSR lists 1.0.1 as latest and marks “Has provenance” as “Complete score.”
+
+### Task 4: Build the one-time provenance repair
+
+**Files:**
+
+- Create: `scripts/repair_jsr_provenance.ts`
+- Create: `test/jsr_provenance_repair.test.ts`
+- Create: `scripts/provenance.lock`
+- Create: `.github/workflows/repair-provenance.yml`
+
+- [ ] **Step 1: Write failing unit tests**
+
+Add tests covering the tarball-bound SLSA subject, JSR OIDC audience, DER-to-PEM conversion, legacy Sigstore-to-JSR bundle conversion, malformed bundle rejection, and non-success HTTP response handling.
+
+- [ ] **Step 2: Run the focused test and verify RED**
+
+```bash
+deno test --no-lock test/jsr_provenance_repair.test.ts
+```
+
+Expected: failure because `scripts/repair_jsr_provenance.ts` does not exist.
+
+- [ ] **Step 3: Implement the repair script**
+
+The script must download JSR's immutable `1.0.1` tarball, hash it with SHA-256, request separate Sigstore and JSR GitHub OIDC tokens, create a SLSA v1 statement, generate a pinned Sigstore legacy DSSE bundle, convert the certificate to PEM, submit the bundle to JSR, and verify the returned `rekorLogId` equals the submitted entry.
+
+- [ ] **Step 4: Add the manual workflow**
+
+Create a `workflow_dispatch`-only workflow with `contents: read` and `id-token: write`. Pin Deno 2.9.2 and run the repair with unrestricted network access, environment access, the dedicated frozen lockfile, and no write access to the repository.
+
+- [ ] **Step 5: Generate the isolated dependency lockfile**
+
+```bash
+deno cache --lock=scripts/provenance.lock scripts/repair_jsr_provenance.ts
+```
+
+Expected: the lockfile pins `npm:sigstore@5.0.0` and its transitive dependencies without changing `deno.lock`.
+
+- [ ] **Step 6: Run focused and repository verification**
+
+```bash
+deno test --no-lock test/jsr_provenance_repair.test.ts
+deno fmt --check --config deno.jsonc
+deno lint --config deno.jsonc
+git diff --check
+```
+
+Expected: all checks pass and `deno.lock` is unchanged.
+
+- [ ] **Step 7: Commit and push the repair workflow**
+
+```bash
+git add .github/workflows/repair-provenance.yml scripts/repair_jsr_provenance.ts scripts/provenance.lock test/jsr_provenance_repair.test.ts
+git commit -m '🩹 fix: repair JSR provenance attestation'
+git push origin master
+```
+
+### Task 5: Execute and verify the repair
+
+**Files:**
+
+- No local file changes
+
+- [ ] **Step 1: Dispatch and monitor the workflow**
+
+```bash
+gh workflow run repair-provenance.yml --ref master
+```
+
+Find the resulting workflow-dispatch run and wait for success.
+
+- [ ] **Step 2: Verify JSR and Rekor independently**
+
+Confirm the JSR version API returns a non-null `rekorLogId`, retrieve that
+entry from Rekor, verify its Fulcio certificate identifies this repository's
+repair workflow, and confirm the JSR score marks “Has provenance” complete.
+
+### Task 6: Remove the one-time workaround
+
+**Files:**
+
+- Delete: `.github/workflows/repair-provenance.yml`
+- Delete: `scripts/repair_jsr_provenance.ts`
+- Delete: `scripts/provenance.lock`
+- Delete: `test/jsr_provenance_repair.test.ts`
+
+- [ ] **Step 1: Remove only the one-time repair files**
+
+Use `apply_patch` to delete the four files after remote verification succeeds.
+
+- [ ] **Step 2: Re-run repository checks**
+
+```bash
+deno fmt --check --config deno.jsonc
+deno lint --config deno.jsonc
+deno publish --dry-run
+git diff --check
+```
+
+- [ ] **Step 3: Commit and push cleanup**
+
+```bash
+git add .github/workflows/repair-provenance.yml scripts/repair_jsr_provenance.ts scripts/provenance.lock test/jsr_provenance_repair.test.ts
+git commit -m '🧹 chore: remove provenance repair workflow'
+git push origin master
+```
