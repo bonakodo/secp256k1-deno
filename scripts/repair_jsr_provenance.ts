@@ -19,7 +19,7 @@ export interface SerializedSigstoreBundle {
     readonly payload: string;
     readonly payloadType: string;
     readonly signatures: readonly {
-      readonly keyid: string;
+      readonly keyid?: string;
       readonly sig: string;
     }[];
   };
@@ -209,7 +209,7 @@ export function toJsrBundle(
         payload: envelope.payload,
         payloadType: envelope.payloadType,
         signatures: [{
-          keyid: envelope.signatures[0].keyid,
+          keyid: envelope.signatures[0].keyid ?? '',
           sig: envelope.signatures[0].sig,
         }],
       },

@@ -11,6 +11,7 @@ import {
   derBase64ToPem,
   type RepairPackage,
   requestGithubOidcToken,
+  type SerializedSigstoreBundle,
   sha256Hex,
   submitJsrProvenance,
   toJsrBundle,
@@ -104,6 +105,28 @@ Deno.test("converts a legacy Sigstore bundle to JSR's wire shape", () => {
   assertEquals(converted.verificationMaterial.tlogEntries, [{
     logIndex: 2167000000,
   }]);
+});
+
+Deno.test("restores Sigstore's omitted default key id for JSR", () => {
+  const serialized = {
+    mediaType: 'application/vnd.dev.sigstore.bundle+json;version=0.1',
+    dsseEnvelope: {
+      payload: 'cGF5bG9hZA==',
+      payloadType: 'application/vnd.in-toto+json',
+      signatures: [{ sig: 'c2lnbmF0dXJl' }],
+    },
+    verificationMaterial: {
+      x509CertificateChain: {
+        certificates: [{ rawBytes: 'Y2VydGlmaWNhdGU=' }],
+      },
+      tlogEntries: [{ logIndex: '2167000000' }],
+    },
+  } as unknown as SerializedSigstoreBundle;
+
+  assertEquals(
+    toJsrBundle(serialized).content.dsseEnvelope.signatures[0].keyid,
+    '',
+  );
 });
 
 Deno.test('rejects malformed Sigstore bundles', () => {
