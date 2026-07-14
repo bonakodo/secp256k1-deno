@@ -6,9 +6,11 @@ import {
 } from '@std/assert';
 
 import {
+  assertRecentPublication,
   buildJsrAudience,
   buildStatement,
   derBase64ToPem,
+  REPAIR_PACKAGE,
   type RepairPackage,
   requestGithubOidcToken,
   type SerializedSigstoreBundle,
@@ -22,6 +24,24 @@ const packageVersion: RepairPackage = {
   name: 'secp256k1',
   version: '1.0.1',
 };
+
+Deno.test('targets the replacement provenance release', () => {
+  assertEquals(REPAIR_PACKAGE, {
+    scope: 'bonakodo',
+    name: 'secp256k1',
+    version: '1.0.2',
+  });
+});
+
+Deno.test("enforces JSR's two-minute provenance window", () => {
+  const now = Date.parse('2026-07-14T09:00:00Z');
+  assertRecentPublication('2026-07-14T08:59:30Z', now);
+  assertThrows(
+    () => assertRecentPublication('2026-07-14T08:58:00Z', now),
+    Error,
+    'outside the provenance attachment window',
+  );
+});
 
 Deno.test('builds a tarball-bound SLSA statement', () => {
   const statement = buildStatement(packageVersion, 'abc123', {

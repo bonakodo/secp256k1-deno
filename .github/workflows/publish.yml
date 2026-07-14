@@ -31,4 +31,10 @@ jobs:
           fi
       - name: Validate package
         run: deno publish --dry-run
-      - run: deno publish
+      - name: Publish package without the incompatible Deno attestation
+        run: deno publish --no-provenance
+      - name: Attach tarball-bound provenance
+        run: >-
+          deno run --frozen --lock=scripts/provenance.lock
+          --allow-env --allow-net
+          scripts/repair_jsr_provenance.ts

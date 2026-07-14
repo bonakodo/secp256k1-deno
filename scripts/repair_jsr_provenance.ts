@@ -55,10 +55,10 @@ export interface JsrProvenanceBundle {
   };
 }
 
-const PACKAGE: RepairPackage = {
+export const REPAIR_PACKAGE: RepairPackage = {
   scope: 'bonakodo',
   name: 'secp256k1',
-  version: '1.0.1',
+  version: '1.0.2',
 };
 
 const INTOTO_PAYLOAD_TYPE = 'application/vnd.in-toto+json';
@@ -164,6 +164,21 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
     new Uint8Array(digest),
     (byte) => byte.toString(16).padStart(2, '0'),
   ).join('');
+}
+
+export function assertRecentPublication(
+  createdAt: string,
+  now = Date.now(),
+): void {
+  const createdAtMilliseconds = Date.parse(createdAt);
+  const age = now - createdAtMilliseconds;
+  if (
+    !Number.isFinite(createdAtMilliseconds) || age < -30_000 || age >= 90_000
+  ) {
+    throw new Error(
+      `Package version is outside the provenance attachment window (age ${age}ms)`,
+    );
+  }
 }
 
 export function derBase64ToPem(rawBytes: string): string {
@@ -301,12 +316,12 @@ async function downloadTarball(
   return new Uint8Array(await response.arrayBuffer());
 }
 
-async function readRekorLogId(
+async function readPublicationCreatedAt(
   packageVersion: RepairPackage,
   fetcher: Fetcher,
-): Promise<string | null> {
+): Promise<string> {
   const response = await fetcher(
-    `${versionApiUrl(packageVersion)}?provenance=${crypto.randomUUID()}`,
+    `${versionApiUrl(packageVersion)}?created=${crypto.randomUUID()}`,
   );
   if (!response.ok) {
     throw new Error(
@@ -316,21 +331,27 @@ async function readRekorLogId(
   }
   const body: unknown = await response.json();
   if (
-    typeof body !== 'object' || body === null || !('rekorLogId' in body) ||
-    (body.rekorLogId !== null && typeof body.rekorLogId !== 'string')
+    typeof body !== 'object' || body === null || !('createdAt' in body) ||
+    typeof body.createdAt !== 'string'
   ) {
-    throw new Error('JSR version response has an invalid rekorLogId');
+    throw new Error('JSR version response has an invalid createdAt');
   }
-  return body.rekorLogId;
+  return body.createdAt;
 }
 
 export async function repairProvenance(
   environment: RepairEnvironment = Deno.env.toObject(),
   fetcher: Fetcher = fetch,
 ): Promise<number> {
-  const tarball = await downloadTarball(PACKAGE, fetcher);
+  const createdAt = await readPublicationCreatedAt(REPAIR_PACKAGE, fetcher);
+  assertRecentPublication(createdAt);
+  const tarball = await downloadTarball(REPAIR_PACKAGE, fetcher);
   const tarballDigest = await sha256Hex(tarball);
-  const statement = buildStatement(PACKAGE, tarballDigest, environment);
+  const statement = buildStatement(
+    REPAIR_PACKAGE,
+    tarballDigest,
+    environment,
+  );
 
   const sigstoreToken = await requestGithubOidcToken(
     'sigstore',
@@ -351,27 +372,17 @@ export async function repairProvenance(
   const bundle = toJsrBundle(serialized);
 
   const jsrToken = await requestGithubOidcToken(
-    buildJsrAudience(PACKAGE, tarballDigest),
+    buildJsrAudience(REPAIR_PACKAGE, tarballDigest),
     environment,
     fetcher,
   );
-  await submitJsrProvenance(PACKAGE, bundle, jsrToken, fetcher);
-
-  const expectedLogIndex = String(
-    bundle.verificationMaterial.tlogEntries[0].logIndex,
-  );
-  const recordedLogIndex = await readRekorLogId(PACKAGE, fetcher);
-  if (recordedLogIndex !== expectedLogIndex) {
-    throw new Error(
-      `JSR recorded Rekor log id ${recordedLogIndex} instead of ${expectedLogIndex}`,
-    );
-  }
+  await submitJsrProvenance(REPAIR_PACKAGE, bundle, jsrToken, fetcher);
   return bundle.verificationMaterial.tlogEntries[0].logIndex;
 }
 
 if (import.meta.main) {
   const logIndex = await repairProvenance();
   console.log(
-    `Attached @bonakodo/secp256k1@1.0.1 provenance at Rekor log index ${logIndex}`,
+    `Attached @bonakodo/secp256k1@1.0.2 provenance at Rekor log index ${logIndex}`,
   );
 }

@@ -46,22 +46,28 @@ mismatched tag exits with an explicit error showing both the expected and
 actual tag. No registry mutation occurs when this guard fails. Test or dry-run
 failures likewise prevent the publish command from running.
 
-## One-Time Provenance Repair
+## One-Time Provenance Replacement Release
 
-A version-fixed manual GitHub Actions workflow will repair `1.0.1` without
-republishing or modifying its immutable package bytes. It downloads JSR's
-stored tarball, hashes those exact bytes, creates a SLSA statement for
-`pkg:jsr/@bonakodo/secp256k1@1.0.1`, and signs it through Sigstore using the
+JSR only updates `rekorLogId` during the first two minutes after version
+creation. Its provenance endpoint returns success without changing older
+versions, so immutable `1.0.1` cannot be repaired after the fact. A metadata-only
+`1.0.2` release will therefore publish and attach corrected provenance in the
+same job.
+
+The publish job will use `deno publish --no-provenance`, immediately download
+JSR's stored `1.0.2` tarball, hash those exact bytes, create a SLSA statement
+for `pkg:jsr/@bonakodo/secp256k1@1.0.2`, and sign it through Sigstore using the
 workflow's GitHub OIDC identity. It then requests a separate JSR-scoped GitHub
-OIDC token and submits the converted Sigstore bundle to JSR's provenance
-endpoint.
+OIDC token and submits the converted Sigstore bundle before a 90-second client
+guard expires.
 
-The repair must fail unless the OIDC requests, Fulcio signing, Rekor upload,
-JSR submission, and JSR version readback all succeed. The workflow will use a
-dedicated dependency lockfile and a pinned Sigstore client. After JSR reports a
-non-null Rekor log id and the score marks provenance complete, the one-time
-workflow, repair script, tests, and lockfile will be removed from the branch.
-Their executed source remains verifiable in Git history and the workflow run.
+The replacement must fail unless version creation is recent, both OIDC
+requests succeed, Fulcio signs the statement, Rekor records it, and JSR accepts
+the bundle. The job uses a dedicated dependency lockfile and pinned Sigstore
+client. After JSR reports a non-null Rekor log id and the score marks provenance
+complete, the one-time workflow code, repair script, tests, and lockfile will
+be removed. Their executed source remains verifiable in Git history and the
+workflow run.
 
 ## Verification
 
@@ -83,13 +89,14 @@ After pushing the release commit and `v1.0.1` tag:
 - Confirm the Rekor entry is publicly retrievable.
 - Confirm JSR lists `1.0.1` as latest and marks “Has provenance” complete.
 
-After the one-time repair:
+After pushing `v1.0.2`:
 
-- Confirm the repair workflow succeeds from `master` with `id-token: write`.
-- Confirm JSR's version API returns the repair's Rekor log id for `1.0.1`.
-- Confirm the public Rekor entry carries this repository's workflow identity.
+- Confirm the publish workflow creates `1.0.2` and attaches provenance within
+  the two-minute server window.
+- Confirm JSR returns a non-null Rekor log id for `1.0.2` after cache expiry.
+- Confirm the public Rekor entry identifies this repository's publish workflow.
 - Confirm JSR marks “Has provenance” complete.
-- Remove the one-time repair files and rerun the repository checks.
+- Remove the one-time repair path and restore ordinary publishing.
 
 ## Scope
 
