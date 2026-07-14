@@ -20,6 +20,15 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: latest
+      - name: Verify release tag
+        shell: bash
+        run: |
+          version="$(deno eval 'console.log(JSON.parse(await Deno.readTextFile("deno.jsonc")).version)')"
+          expected="v${version}"
+          if [[ "$GITHUB_REF_NAME" != "$expected" ]]; then
+            echo "::error::Release tag '$GITHUB_REF_NAME' does not match package version '$version' (expected '$expected')."
+            exit 1
+          fi
       - name: Validate package
         run: deno publish --dry-run
       - run: deno publish
