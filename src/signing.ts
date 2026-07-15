@@ -13,10 +13,13 @@
 import * as digest from './api/digest.ts';
 import * as keys from './api/keys.ts';
 import { invalidInput } from './api/input.ts';
+import { fillRandomSecretKey, isValidSecretKey } from './api/secret_key.ts';
 import * as signatures from './api/signatures.ts';
 import { verifyEcdsa } from './api/verify.ts';
-import { withSigningContext, withStaticContext } from './native/context.ts';
+import { withSigningContext } from './native/context.ts';
 import { getNativeSymbols, requireCapability } from './native/loader.ts';
+
+export { SecretKeyRandomError } from './api/secret_key.ts';
 
 // Explicit aliases keep duplicate entrypoint exports documented by JSR while
 // preserving the identity of these immutable source bindings.
@@ -125,21 +128,18 @@ export class SecretKey implements Disposable {
   }
 
   /**
-   * Generates a key with Web Crypto and rejects invalid curve scalars.
+   * Generates a key from one Web Crypto sample and rejects invalid scalars.
    *
    * @returns A new independently owned disposable key.
+   * @throws {SecretKeyRandomError} If Web Crypto returns an invalid scalar.
    * @throws Native configuration, loading, or runtime errors unchanged.
    * @since 1.0.0
    */
   static generate(): SecretKey {
     const candidate = new Uint8Array(SECRET_KEY_SIZE);
     try {
-      while (true) {
-        crypto.getRandomValues(candidate);
-        if (isValidSecretKey(candidate)) {
-          return new SecretKey(candidate.slice());
-        }
-      }
+      fillRandomSecretKey(candidate);
+      return new SecretKey(candidate.slice());
     } finally {
       candidate.fill(0);
     }
@@ -467,13 +467,6 @@ export function signTaprootSignature(
     keypair.fill(0);
     xOnly.fill(0);
   }
-}
-
-function isValidSecretKey(bytes: Uint8Array): boolean {
-  const symbols = getNativeSymbols();
-  return withStaticContext((context) =>
-    symbols.secp256k1_ec_seckey_verify(context, bytes) === 1
-  );
 }
 
 function ecdsaSigningErrorMessage(code: EcdsaSigningErrorCode): string {

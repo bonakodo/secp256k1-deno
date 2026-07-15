@@ -37,45 +37,14 @@
  * @since 1.0.0
  */
 
+import { fillRandomSecretKey } from './api/secret_key.ts';
 import { withSigningContext } from './native/context.ts';
 import { requireEllSwift, requireEllSwiftSymbols } from './native/loader.ts';
 
+export { SecretKeyRandomError } from './api/secret_key.ts';
+
 const ELLSWIFT_ENCODING_SIZE = 64;
 const SECRET_SIZE = 32;
-const GROUP_ORDER = Uint8Array.from([
-  0xff,
-  0xff,
-  0xff,
-  0xff,
-  0xff,
-  0xff,
-  0xff,
-  0xff,
-  0xff,
-  0xff,
-  0xff,
-  0xff,
-  0xff,
-  0xff,
-  0xff,
-  0xfe,
-  0xba,
-  0xae,
-  0xdc,
-  0xe6,
-  0xaf,
-  0x48,
-  0xa0,
-  0x3b,
-  0xbf,
-  0xd2,
-  0x5e,
-  0x8c,
-  0xd0,
-  0x36,
-  0x41,
-  0x41,
-]);
 
 type Bip324Role = 'initiator' | 'responder';
 
@@ -352,6 +321,7 @@ export class Bip324KeyExchange implements Disposable {
    * ElligatorSwift auxiliary randomness are obtained from Web Crypto.
    *
    * @returns A disposable exchange containing a new ephemeral secret.
+   * @throws {SecretKeyRandomError} If Web Crypto returns an invalid scalar.
    * @throws {Bip324NativeError} If native ElligatorSwift creation fails.
    * @throws {NativeCapabilityError} If libsecp256k1 lacks ElligatorSwift.
    * @throws Native configuration, loading, and context errors unchanged.
@@ -368,6 +338,7 @@ export class Bip324KeyExchange implements Disposable {
    * ElligatorSwift auxiliary randomness are obtained from Web Crypto.
    *
    * @returns A disposable exchange containing a new ephemeral secret.
+   * @throws {SecretKeyRandomError} If Web Crypto returns an invalid scalar.
    * @throws {Bip324NativeError} If native ElligatorSwift creation fails.
    * @throws {NativeCapabilityError} If libsecp256k1 lacks ElligatorSwift.
    * @throws Native configuration, loading, and context errors unchanged.
@@ -492,7 +463,7 @@ export class Bip324KeyExchange implements Disposable {
     const auxiliaryRandomness = new Uint8Array(SECRET_SIZE);
     const encoding = new Uint8Array(ELLSWIFT_ENCODING_SIZE);
     try {
-      fillSecretKey(secret);
+      fillRandomSecretKey(secret);
       crypto.getRandomValues(auxiliaryRandomness);
       const succeeded = withSigningContext((context) =>
         symbols.secp256k1_ellswift_create(
@@ -514,24 +485,6 @@ export class Bip324KeyExchange implements Disposable {
       auxiliaryRandomness.fill(0);
     }
   }
-}
-
-function fillSecretKey(candidate: Uint8Array): void {
-  do {
-    crypto.getRandomValues(candidate);
-  } while (!isValidSecretKey(candidate));
-}
-
-function isValidSecretKey(candidate: Uint8Array): boolean {
-  let nonzero = false;
-  let order = 0;
-  for (let index = 0; index < candidate.length; index++) {
-    nonzero ||= candidate[index] !== 0;
-    if (order === 0) {
-      order = Math.sign(candidate[index] - GROUP_ORDER[index]);
-    }
-  }
-  return nonzero && order < 0;
 }
 
 function inputErrorMessage(code: Bip324InputErrorCode): string {
