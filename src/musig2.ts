@@ -347,6 +347,20 @@ export interface MuSigSecretNonceGeneration {
    * @since 1.0.0
    */
   readonly keyAggregation: MuSigKeyAggregation;
+  /**
+   * Extra caller context mixed into the native nonce derivation.
+   *
+   * Same-message retries should pass a unique value for every generation call,
+   * such as an application session ID, a counter, or other signers' public
+   * nonces. This adds protection if random session bytes repeat, but does not
+   * replace the need for fresh secure randomness.
+   *
+   * The context need not be secret and may have any length. This method copies
+   * it before hashing it with the participant index.
+   *
+   * @since 1.0.4
+   */
+  readonly nonceContext?: Uint8Array;
 }
 
 /**
@@ -929,10 +943,11 @@ export class MuSigSecretNonce implements Disposable {
    * Generates fresh randomness and binds every available signing input.
    *
    * The native nonce derivation receives the secret key, exact indexed public
-   * key, digest, key aggregation cache, and an index-specific extra input.
-   * Session randomness and temporary secret-key copies are wiped immediately.
+   * key, digest, key aggregation cache, and an extra input derived from the
+   * participant index and optional nonce context. Session randomness and
+   * temporary secret-key copies are wiped immediately.
    *
-   * @param options Indexed key, digest, and aggregation bindings.
+   * @param options Indexed key, digest, aggregation, and nonce context.
    * @returns An opaque single-use secret nonce handle.
    * @throws {MuSigRandomError} If secure randomness is unavailable.
    * @throws {MuSigStateError} If the index or secret key is invalid or mismatched.
@@ -967,7 +982,10 @@ export class MuSigSecretNonce implements Disposable {
       } catch (cause) {
         throw new MuSigRandomError({ cause });
       }
-      const extraInput = participantBinding(options.participantIndex);
+      const extraInput = participantBinding(
+        options.participantIndex,
+        options.nonceContext,
+      );
       const nativeSecretNonce = new Uint8Array(SECRET_NONCE_SIZE);
       unclaimedSecretNonce = nativeSecretNonce;
       const nativePublicNonce = new Uint8Array(PUBLIC_NONCE_SIZE);
@@ -1645,9 +1663,13 @@ function taggedHash(tag: string, message: Uint8Array): Uint8Array {
   return output;
 }
 
-function participantBinding(participantIndex: number): Uint8Array {
-  const bytes = new Uint8Array(8);
+function participantBinding(
+  participantIndex: number,
+  nonceContext?: Uint8Array,
+): Uint8Array {
+  const bytes = new Uint8Array(8 + (nonceContext?.length ?? 0));
   new DataView(bytes.buffer).setBigUint64(0, BigInt(participantIndex), false);
+  if (nonceContext !== undefined) bytes.set(nonceContext, 8);
   return taggedHash('DenoMuSig/participant', bytes);
 }
 

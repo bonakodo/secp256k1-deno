@@ -168,6 +168,52 @@ ffiTest(
   },
 );
 
+ffiTest('MuSig2 mixes caller context into secret nonce generation', () => {
+  const aggregation = MuSigKeyAggregation.fromOrderedPublicKeys([
+    CompressedPublicKey.parse(G),
+  ]);
+  const digest = Digest32.fromBytes(new Uint8Array(32).fill(9));
+  const descriptor = Object.getOwnPropertyDescriptor(crypto, 'getRandomValues');
+  Object.defineProperty(crypto, 'getRandomValues', {
+    configurable: true,
+    value(candidate: Uint8Array): Uint8Array {
+      candidate.fill(7);
+      return candidate;
+    },
+  });
+
+  const nonces: MuSigSecretNonce[] = [];
+  try {
+    const generate = (nonceContext: Uint8Array): MuSigSecretNonce => {
+      const nonce = MuSigSecretNonce.generate({
+        participantIndex: 0,
+        secretKey: new TestSigningKey(1),
+        digest,
+        keyAggregation: aggregation,
+        nonceContext,
+      });
+      nonces.push(nonce);
+      return nonce;
+    };
+    const first = generate(new Uint8Array([1]));
+    const replay = generate(new Uint8Array([1]));
+    const nextSession = generate(new Uint8Array([2]));
+
+    assertEquals(first.publicNonce.toBytes(), replay.publicNonce.toBytes());
+    assertNotEquals(
+      toHex(first.publicNonce.toBytes()),
+      toHex(nextSession.publicNonce.toBytes()),
+    );
+  } finally {
+    for (const nonce of nonces) nonce.destroy();
+    if (descriptor === undefined) {
+      delete (crypto as unknown as Record<string, unknown>).getRandomValues;
+    } else {
+      Object.defineProperty(crypto, 'getRandomValues', descriptor);
+    }
+  }
+});
+
 ffiTest(
   'MuSig2 preserves key order and sorts only on explicit request',
   () => {
